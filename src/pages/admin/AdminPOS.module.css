@@ -1,0 +1,363 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.productSection {
+  min-width: 0;
+}
+
+.productGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+  gap: 10px;
+}
+
+.productCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 154px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--white);
+  border-radius: 16px;
+  padding: 12px;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.productCard:hover {
+  border-color: var(--orange-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.productCard:active {
+  transform: scale(0.99);
+}
+
+.productVisual {
+  height: 76px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.85);
+  background:
+    radial-gradient(circle at 25% 20%, rgba(255, 195, 0, 0.55), transparent 45%),
+    linear-gradient(135deg, #6b2a00, #e85d04);
+}
+
+.productVisual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.productName {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.productMeta {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.productBottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.productPrice {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.productAdd {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--cream-2);
+  color: var(--brown);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.productCard:hover .productAdd {
+  background: var(--orange);
+  color: #fff;
+}
+
+.cartPanel {
+  position: sticky;
+  top: 80px;
+}
+
+.cartItems {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 44vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.cartItem {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--white);
+}
+
+.cartItemTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cartItemName {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.cartItemMeta {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.cartItemBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.qtyControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qtyBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.qtyBtn:hover {
+  background: var(--cream);
+}
+
+.qtyValue {
+  min-width: 18px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.lineTotal {
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.totals {
+  border-top: 1px dashed var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.totalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+.totalRow strong {
+  color: var(--text);
+}
+
+.grandTotal {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.mobileCartBar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  background: var(--brown);
+  color: var(--cream);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 -8px 30px rgba(74, 28, 0, 0.25);
+}
+
+.mobileCartBar .grandTotal {
+  color: var(--cream);
+  font-size: 1.45rem;
+}
+
+.paymentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.paymentMethodBtn {
+  border: 1px solid var(--line);
+  background: var(--white);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.paymentMethodBtn:hover {
+  border-color: var(--orange);
+  background: var(--cream);
+}
+
+.paymentMethodName {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.paymentMethodMeta {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.paymentLine {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--white);
+  margin-bottom: 8px;
+}
+
+.paymentLineTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.paymentLineName {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.paymentLineDelete {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.paymentLineDelete:hover {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.paymentLineGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 8px;
+}
+
+.rateRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.rateBtn {
+  border: 1px solid var(--line);
+  background: var(--white);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.rateBtnActive {
+  background: var(--brown);
+  border-color: var(--brown);
+  color: var(--cream);
+}
+
+.cartEmpty {
+  padding: 28px 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cartPanel {
+    display: none;
+  }
+
+  .mobileCartBar {
+    display: flex;
+  }
+}
+
+@media (max-width: 520px) {
+  .productGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .productCard {
+    min-height: 142px;
+    padding: 10px;
+  }
+
+  .productVisual {
+    height: 64px;
+  }
+}

@@ -1,0 +1,216 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.diagramCard {
+  position: sticky;
+  top: 80px;
+}
+
+.diagramSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255, 195, 0, 0.12), transparent 40%),
+    var(--cream);
+}
+
+.hotspot {
+  cursor: pointer;
+}
+
+.hotspot rect {
+  fill: var(--white);
+  stroke: var(--line);
+  transition: fill 0.15s ease, stroke 0.15s ease;
+}
+
+.hotspot text {
+  fill: var(--text);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.hotspot:hover rect {
+  fill: var(--cream-2);
+}
+
+.hotspotActive rect {
+  fill: var(--orange);
+  stroke: var(--orange);
+}
+
+.hotspotActive text {
+  fill: #fff;
+}
+
+.hotspotSub {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  fill: var(--muted) !important;
+}
+
+.hotspotActive .hotspotSub {
+  fill: rgba(255, 255, 255, 0.8) !important;
+}
+
+.productTabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.summaryItem {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.summaryLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.summaryValue {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin-top: 3px;
+}
+
+.slotList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slotRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.slotRow:hover {
+  border-color: var(--orange-2);
+  background: var(--cream);
+}
+
+.slotRowActive {
+  border-color: var(--orange);
+  background: rgba(232, 93, 4, 0.06);
+}
+
+.slotIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--cream-2);
+  color: var(--orange);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.slotBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.slotTitle {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.slotMeta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.slotCost {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--white);
+}
+
+.optionBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.optionName {
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.optionMeta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.optionCost {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.priceEditor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 1000px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .diagramCard {
+    position: static;
+  }
+}
+
+@media (max-width: 520px) {
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .priceEditor {
+    grid-template-columns: 1fr;
+  }
+}
