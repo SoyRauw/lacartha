@@ -1,6 +1,6 @@
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) minmax(520px, 0.95fr);
   gap: 16px;
   align-items: start;
 }
@@ -374,6 +374,394 @@
 
 .methodPanelReference {
   margin-top: 6px;
+}
+
+.salePanelDesktop {
+  position: sticky;
+  top: 80px;
+  min-width: 0;
+}
+
+.salePanel {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 300px);
+  overflow: hidden;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.saleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.saleHeaderTitle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.saleHeaderTitle h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.saleHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.saleBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.saleLeft,
+.saleRight {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+.saleSection {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 9px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.sectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 7px;
+}
+
+.fieldRow label {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.rateNumber {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--brown);
+}
+
+.rateOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.paymentList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.paymentRow {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px;
+  background: #fffdf8;
+}
+
+.paymentHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 5px;
+  font-size: 10.5px;
+}
+
+.paymentCurrency {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.paymentInput {
+  text-align: right;
+  font-weight: 800;
+}
+
+.paymentRef {
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.itemsSection {
+  display: flex;
+  flex-direction: column;
+  min-height: 120px;
+}
+
+.itemsList {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 30vh;
+  padding-right: 2px;
+}
+
+.saleEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 20px 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.saleEmpty p {
+  font-size: 10.5px;
+}
+
+.saleItem {
+  display: flex;
+  gap: 8px;
+  padding: 7px 2px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.saleItem:last-child {
+  border-bottom: 0;
+}
+
+.saleItemBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.saleItemName {
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.saleItemMeta {
+  font-size: 9px;
+  color: var(--muted);
+  line-height: 1.35;
+  margin-top: 1px;
+}
+
+.saleItemBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.saleItemPrice {
+  font-size: 8.5px;
+  color: var(--muted);
+}
+
+.saleItemRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.saleItemRight strong {
+  font-size: 11px;
+}
+
+.saleItemRemove {
+  border: 0;
+  background: transparent;
+  color: var(--muted-2);
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.saleItemRemove:hover {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 3px 0;
+}
+
+.summaryRow strong {
+  color: var(--text);
+}
+
+.summaryTotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  margin: 3px 0;
+}
+
+.summaryTotal strong {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  color: var(--text);
+  line-height: 1;
+}
+
+.summaryChange,
+.summaryMissing,
+.summaryOk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.summaryChange {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.summaryMissing {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.summaryOk {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.saleFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--white);
+  flex-shrink: 0;
+}
+
+.footerHint {
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footerActions .btn-primary {
+  flex: 1;
+}
+
+.salePanelMobile {
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.modalSaleFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.salePanelMobile .saleFooter {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  box-shadow: 0 -8px 18px rgba(74, 28, 0, 0.08);
+}
+
+@media (max-width: 1200px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .salePanelDesktop {
+    display: none;
+  }
+
+  .mobileCartBar {
+    display: flex;
+  }
+
+  .saleBody {
+    grid-template-columns: 1fr;
+  }
+
+  .salePanel {
+    max-height: none;
+  }
+
+  .itemsList {
+    max-height: 38vh;
+  }
 }
 
 @media (max-width: 980px) {

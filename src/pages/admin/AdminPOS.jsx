@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
+  ArrowDownUp,
   Banknote,
   Calculator,
   CheckCircle2,
@@ -129,7 +130,6 @@ export default function AdminPOS() {
     quantity: '1',
     notes: '',
   })
-  const [paymentOpen, setPaymentOpen] = useState(false)
   const [payments, setPayments] = useState([])
   const [rateSource, setRateSource] = useState('bcv_eur')
   const [rateValue, setRateValue] = useState('')
@@ -384,6 +384,21 @@ export default function AdminPOS() {
     remaining <= 0.011 &&
     referencesOk &&
     changeCovered
+  const saleHint = !cart.length
+    ? 'Agrega productos para empezar'
+    : !customerOk
+      ? 'Completa nombre y teléfono'
+      : !cashSession
+        ? 'Abre la caja para cobrar'
+        : activePayments.length === 0
+          ? 'Escribe el monto de al menos un pago'
+          : remaining > 0.011
+            ? 'Faltan ' + money(remaining)
+            : changeDue > 0.011 && !changeCovered
+              ? 'Completa el vuelto'
+              : !referencesOk
+                ? 'Completa las referencias obligatorias'
+                : 'Listo para finalizar'
 
   useEffect(() => {
     if (changeDue <= 0.011) {
@@ -531,27 +546,6 @@ export default function AdminPOS() {
     setSaleNotes('')
     loadedOrderRef.current = null
     setSearchParams({})
-  }
-
-  const openPayment = () => {
-    if (!cart.length) return
-    if (!cashSession) {
-      setOpenCashOpen(true)
-      push('Abre la caja antes de cobrar', 'error')
-      return
-    }
-    const source = rateSource || 'bcv_eur'
-    const value =
-      parseNumber(rateValue) ||
-      getRateValue(catalog.rate, source) ||
-      Number(cashSession.exchange_rate) ||
-      0
-    setRateSource(source)
-    if (value) setRateValue(String(value))
-    setPayments([])
-    setChangeValue(emptyChange())
-    if (!orderId) setSaleNotes('')
-    setPaymentOpen(true)
   }
 
   const paymentFor = (methodId) =>
@@ -878,7 +872,6 @@ export default function AdminPOS() {
       }
 
       setCompletedSale(receiptSale)
-      setPaymentOpen(false)
       setCart([])
       setPayments([])
       setSaleNotes('')
@@ -927,96 +920,363 @@ export default function AdminPOS() {
     }
   }
 
-  const renderCart = () => (
-    <>
-      <div className={styles.cartItems}>
-        {cart.length === 0 ? (
-          <div className={styles.cartEmpty}>
-            <ShoppingCart size={28} style={{ color: 'var(--orange)', marginBottom: 8 }} />
-            <p>El carrito está vacío.</p>
-            <p style={{ marginTop: 4 }}>Toca un producto para empezar.</p>
-          </div>
-        ) : (
-          cart.map((item) => (
-            <div className={styles.cartItem} key={item.key}>
-              <div className={styles.cartItemTop}>
-                <div>
-                  <div className={styles.cartItemName}>{item.product.name}</div>
-                  {item.selectedOptions.length ? (
-                    <div className={styles.cartItemMeta}>
-                      {optionNames(item.selectedOptions).join(' · ')}
-                    </div>
-                  ) : null}
-                  {item.notes ? (
-                    <div className={styles.cartItemMeta}>Nota: {item.notes}</div>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  className={styles.paymentLineDelete}
-                  onClick={() => removeItem(item.key)}
-                  aria-label="Quitar"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <div className={styles.cartItemBottom}>
-                <div className={styles.qtyControls}>
-                  <button type="button" className={styles.qtyBtn} onClick={() => updateQty(item.key, -1)}>
-                    <Minus size={13} />
-                  </button>
-                  <span className={styles.qtyValue}>{item.quantity}</span>
-                  <button type="button" className={styles.qtyBtn} onClick={() => updateQty(item.key, 1)}>
-                    <Plus size={13} />
-                  </button>
-                </div>
-                <div className={styles.lineTotal}>
-                  {money(Number(item.unitPrice) * Number(item.quantity))}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className={styles.totals}>
-        <div className={styles.totalRow}>
-          <span>Subtotal</span>
-          <strong>{money(total)}</strong>
-        </div>
-        <div className={styles.totalRow}>
-          <span>Total Bs</span>
-          <strong>{formatBs(totalBs)}</strong>
-        </div>
-        <div className={`${styles.totalRow} mt-2`}>
-          <span>Total</span>
-          <span className={styles.grandTotal}>{money(total)}</span>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        className="btn btn-primary btn-block btn-lg mt-3"
-        onClick={openPayment}
-        disabled={!cart.length}
-      >
-        <Calculator size={17} /> Cobrar {money(total)}
-      </button>
-      {!cashSession ? (
+  const renderSaleFooter = (mobile = false) => (
+    <div className={mobile ? styles.modalSaleFooter : styles.saleFooter}>
+      <p className={styles.footerHint}>{saleHint}</p>
+      <div className={styles.footerActions}>
         <button
           type="button"
-          className="btn btn-block mt-2"
-          onClick={() => setOpenCashOpen(true)}
+          className="btn"
+          onClick={clearCart}
+          disabled={!cart.length || submitting}
         >
-          Abrir caja para cobrar
+          Vaciar
         </button>
-      ) : (
-        <p className="tiny muted mt-2" style={{ textAlign: 'center' }}>
-          Caja abierta · {money(cashSession.opening_usd)} USD · {formatBs(cashSession.opening_bs)}
-        </p>
-      )}
-    </>
+        <button
+          type="button"
+          className="btn btn-primary btn-lg"
+          onClick={handleCharge}
+          disabled={!canCharge || submitting || !cashSession}
+        >
+          {submitting ? (
+            <Loader2 size={16} className="spin" />
+          ) : (
+            <Calculator size={16} />
+          )}
+          {submitting
+            ? 'Registrando...'
+            : canCharge
+              ? 'Finalizar venta · ' + money(total)
+              : 'Finalizar venta'}
+        </button>
+      </div>
+    </div>
   )
+
+  const renderSalePanel = (mobile = false) => {
+    return (
+      <div className={styles.salePanel + (mobile ? ' ' + styles.salePanelMobile : '')}>
+        <div className={styles.saleHeader}>
+          <div className={styles.saleHeaderTitle}>
+            <ShoppingCart size={18} style={{ color: 'var(--orange)' }} />
+            <div>
+              <h3>Venta actual</h3>
+              <p className="tiny muted">
+                {orderId
+                  ? 'Comanda ' + (orderData?.order_number || '')
+                  : cartCount + ' artículo' + (cartCount === 1 ? '' : 's')}
+              </p>
+            </div>
+          </div>
+          <div className={styles.saleHeaderActions}>
+            {orderId ? (
+              <span className="badge badge-yellow">Comanda</span>
+            ) : (
+              <span className="badge">Mostrador</span>
+            )}
+            {orderData ? (
+              <span
+                className={
+                  'badge ' +
+                  (orderData.fulfillment === 'delivery' ? 'badge-orange' : 'badge-green')
+                }
+              >
+                {orderData.fulfillment === 'delivery' ? 'Delivery' : 'Comer aquí'}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className={styles.saleBody}>
+          <div className={styles.saleLeft}>
+            <section className={styles.saleSection}>
+              <div className={styles.sectionHead}>
+                <span className={styles.sectionTitle}>
+                  <User size={13} /> Cliente
+                </span>
+                <span className={'badge ' + (customerOk ? 'badge-green' : 'badge-yellow')}>
+                  {customerOk ? 'Listo' : 'Faltan datos'}
+                </span>
+              </div>
+              <div className={styles.fieldRow}>
+                <label>Nombre *</label>
+                <input
+                  className="input"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nombre del cliente"
+                />
+              </div>
+              <div className={styles.fieldRow}>
+                <label>Teléfono *</label>
+                <input
+                  className="input"
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="0414-0000000"
+                />
+              </div>
+              {orderData ? (
+                <p className="tiny muted">
+                  {orderData.fulfillment === 'delivery'
+                    ? 'Delivery: ' +
+                      (orderData.address || 'sin dirección') +
+                      ' · costo por cotizar'
+                    : 'Comer aquí · paga en caja'}
+                </p>
+              ) : null}
+            </section>
+
+            <section className={styles.saleSection}>
+              <div className={styles.sectionHead}>
+                <span className={styles.sectionTitle}>
+                  <ArrowDownUp size={13} /> Tasa Bs/USD
+                </span>
+                <strong className={styles.rateNumber}>{number(rateValue)}</strong>
+              </div>
+              <div className={styles.rateOptions}>
+                {BS_RATE_SOURCES.map((source) => (
+                  <button
+                    key={source.value}
+                    type="button"
+                    className={
+                      styles.rateBtn +
+                      (rateSource === source.value ? ' ' + styles.rateBtnActive : '')
+                    }
+                    onClick={() => changeRateSource(source.value)}
+                  >
+                    {source.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                className="input mt-2"
+                type="number"
+                min="0"
+                step="0.01"
+                value={rateValue}
+                onChange={(e) => applyRateValue(e.target.value)}
+                placeholder="Tasa Bs/USD"
+              />
+            </section>
+
+            <section className={styles.saleSection}>
+              <div className={styles.sectionHead}>
+                <span className={styles.sectionTitle}>
+                  <Wallet size={13} /> Pagos
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={clearPayments}
+                >
+                  Limpiar
+                </button>
+              </div>
+              <div className={styles.paymentList}>
+                {paymentMethods.map((method) => {
+                  const Icon = methodIcon(method.code)
+                  const payment = paymentFor(method.id)
+                  const isCashUsd = method.affects_cash && method.currency === 'USD'
+                  const amount = payment?.amount ?? ''
+                  const amountUsd = Number(payment?.amountUsd) || 0
+                  return (
+                    <div
+                      className={styles.paymentRow}
+                      key={method.id}
+                      data-method={method.code}
+                    >
+                      <div className={styles.paymentHead}>
+                        <span className="flex items-center gap-2">
+                          <Icon size={14} style={{ color: 'var(--orange)' }} />
+                          <strong>{method.name}</strong>
+                        </span>
+                        <span className={styles.paymentCurrency}>
+                          {method.currency === 'BS' ? 'Bs' : method.currency}
+                          {method.affects_cash ? ' · caja' : ''}
+                        </span>
+                      </div>
+                      {isCashUsd ? (
+                        <div>
+                          <BillPicker
+                            value={payment?.bills || emptyBillCounts()}
+                            onChange={(bills) => setPaymentBills(method, bills)}
+                            compact
+                            label=""
+                            showTotal={false}
+                            showClear={false}
+                          />
+                          <p className="tiny muted mt-1">
+                            Entrega: {money(amountUsd)}
+                          </p>
+                        </div>
+                      ) : (
+                        <input
+                          className={'input ' + styles.paymentInput}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={amount}
+                          onChange={(e) => setPaymentAmount(method, e.target.value)}
+                          placeholder={
+                            method.currency === 'BS'
+                              ? 'Bs 0,00'
+                              : method.currency === 'USDT'
+                                ? 'USDT 0,00'
+                                : '$0,00'
+                          }
+                        />
+                      )}
+                      {method.requires_reference ? (
+                        <input
+                          className={'input ' + styles.paymentRef}
+                          value={payment?.reference || ''}
+                          onChange={(e) => setPaymentReference(method, e.target.value)}
+                          placeholder="Referencia obligatoria"
+                        />
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          </div>
+
+          <div className={styles.saleRight}>
+            <section className={styles.saleSection + ' ' + styles.itemsSection}>
+              <div className={styles.sectionHead}>
+                <span className={styles.sectionTitle}>
+                  <ShoppingCart size={13} /> Productos
+                </span>
+                <span className="tiny muted">
+                  {cartCount} artículo{cartCount === 1 ? '' : 's'}
+                </span>
+              </div>
+              {cart.length === 0 ? (
+                <div className={styles.saleEmpty}>
+                  <ShoppingCart size={26} />
+                  <p>Toca un producto para empezar.</p>
+                </div>
+              ) : (
+                <div className={styles.itemsList}>
+                  {cart.map((item) => (
+                    <div className={styles.saleItem} key={item.key}>
+                      <div className={styles.saleItemBody}>
+                        <div className={styles.saleItemName}>{item.product.name}</div>
+                        {item.selectedOptions.length ? (
+                          <div className={styles.saleItemMeta}>
+                            {optionNames(item.selectedOptions).join(' · ')}
+                          </div>
+                        ) : null}
+                        {item.notes ? (
+                          <div className={styles.saleItemMeta}>Nota: {item.notes}</div>
+                        ) : null}
+                        <div className={styles.saleItemBottom}>
+                          <div className={styles.qtyControls}>
+                            <button
+                              type="button"
+                              className={styles.qtyBtn}
+                              onClick={() => updateQty(item.key, -1)}
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <span className={styles.qtyValue}>{item.quantity}</span>
+                            <button
+                              type="button"
+                              className={styles.qtyBtn}
+                              onClick={() => updateQty(item.key, 1)}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                          <span className={styles.saleItemPrice}>
+                            {money(item.unitPrice)} c/u
+                          </span>
+                        </div>
+                      </div>
+                      <div className={styles.saleItemRight}>
+                        <strong>
+                          {money(Number(item.unitPrice) * Number(item.quantity))}
+                        </strong>
+                        <button
+                          type="button"
+                          className={styles.saleItemRemove}
+                          onClick={() => removeItem(item.key)}
+                          aria-label="Quitar"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className={styles.saleSection}>
+              <div className={styles.sectionHead}>
+                <span className={styles.sectionTitle}>Resumen</span>
+              </div>
+              <div className={styles.summaryRow}>
+                <span>Subtotal</span>
+                <strong>{money(total)}</strong>
+              </div>
+              <div className={styles.summaryRow}>
+                <span>Total Bs</span>
+                <strong>{formatBs(totalBs)}</strong>
+              </div>
+              <div className={styles.summaryTotal}>
+                <span>Total</span>
+                <strong>{money(total)}</strong>
+              </div>
+              <div className={styles.summaryRow}>
+                <span>Pagado</span>
+                <strong>{money(paidUsd)}</strong>
+              </div>
+              {changeDue > 0.011 ? (
+                <div className={styles.summaryChange}>
+                  <span>Vuelto</span>
+                  <strong>{money(changeDue)}</strong>
+                </div>
+              ) : remaining > 0.011 ? (
+                <div className={styles.summaryMissing}>
+                  <span>Faltante</span>
+                  <strong>{money(remaining)}</strong>
+                </div>
+              ) : (
+                <div className={styles.summaryOk}>
+                  <span>Cubierto</span>
+                  <strong>Listo</strong>
+                </div>
+              )}
+              {changeDue > 0.011 ? (
+                <VueltoMixto
+                  changeDue={changeDue}
+                  drawer={sessionDrawer}
+                  rate={rateNumber}
+                  value={changeValue}
+                  onChange={setChangeValue}
+                  disabled={submitting}
+                />
+              ) : null}
+              <div className={styles.fieldRow} style={{ marginTop: 8 }}>
+                <label>Nota de la venta</label>
+                <input
+                  className="input"
+                  value={saleNotes}
+                  onChange={(e) => setSaleNotes(e.target.value)}
+                  placeholder="Opcional"
+                />
+              </div>
+            </section>
+          </div>
+        </div>
+
+        {!mobile ? renderSaleFooter(false) : null}
+      </div>
+    )
+  }
 
   if (!catalog.ready) {
     return (
@@ -1205,20 +1465,8 @@ export default function AdminPOS() {
           </div>
         </div>
 
-        <aside className={styles.cartPanel}>
-          <div className="card">
-            <div className="flex items-center justify-between mb-2">
-              <p className="card-title" style={{ margin: 0 }}>
-                <ShoppingCart size={16} /> Carrito ({cartCount})
-              </p>
-              {cart.length ? (
-                <button type="button" className="btn btn-sm btn-ghost" onClick={clearCart}>
-                  Vaciar
-                </button>
-              ) : null}
-            </div>
-            {renderCart()}
-          </div>
+        <aside className={styles.salePanelDesktop}>
+          {renderSalePanel()}
         </aside>
       </div>
 
@@ -1233,7 +1481,7 @@ export default function AdminPOS() {
             className="btn btn-primary"
             onClick={() => setCartOpen(true)}
           >
-            Ver carrito
+            Ver venta
           </button>
         </div>
       ) : null}
@@ -1376,239 +1624,6 @@ export default function AdminPOS() {
       </Modal>
 
       <Modal
-        open={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
-        title="Cobrar"
-        icon={Wallet}
-        wide
-        footer={
-          <>
-            <button type="button" className="btn" onClick={() => setPaymentOpen(false)} disabled={submitting}>
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary btn-lg"
-              onClick={handleCharge}
-              disabled={!canCharge || submitting}
-            >
-              {submitting ? <Loader2 size={16} className="spin" /> : <CheckCircle2 size={16} />}
-              {submitting ? 'Registrando...' : `Cobrar ${money(total)}`}
-            </button>
-          </>
-        }
-      >
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div>
-            <p className="label">Total a cobrar</p>
-            <p className="money" style={{ fontSize: 26 }}>{money(total)}</p>
-            <p className="small muted">{formatBs(totalBs)}</p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <p className="label">Pagado</p>
-            <p className="money positive" style={{ fontSize: 18 }}>{money(paidUsd)}</p>
-            {changeDue > 0.011 ? (
-              <p className="small positive">Vuelto {money(changeDue)}</p>
-            ) : (
-              <p className={`small ${remaining > 0.011 ? 'negative' : 'positive'}`}>
-                {remaining > 0.011 ? `Faltan ${money(remaining)}` : 'Cubierto'}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.customerBox}>
-          <div className="flex items-center justify-between gap-2 wrap mb-2">
-            <p className="label" style={{ margin: 0 }}>
-              <User size={14} style={{ verticalAlign: -2 }} /> Datos del cliente
-            </p>
-            {orderId ? (
-              <span className="badge badge-yellow">
-                Comanda {orderData?.order_number || ''}
-              </span>
-            ) : null}
-          </div>
-          <div className="form-grid">
-            <div className="field">
-              <label>Nombre *</label>
-              <input
-                className="input"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Nombre del cliente"
-              />
-            </div>
-            <div className="field">
-              <label>Teléfono *</label>
-              <input
-                className="input"
-                type="tel"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="0414-0000000"
-              />
-            </div>
-          </div>
-          {orderId ? (
-            <p className="tiny muted mt-1">
-              Datos traídos de la comanda. Puedes editarlos.
-            </p>
-          ) : null}
-          {!customerOk ? (
-            <p className="small negative mt-1">
-              Completa nombre y teléfono para cobrar.
-            </p>
-          ) : null}
-        </div>
-
-        <p className="label mb-1">Tasa para bolívares</p>
-        <div className={styles.rateRow}>
-          {BS_RATE_SOURCES.map((source) => (
-            <button
-              key={source.value}
-              type="button"
-              className={`${styles.rateBtn} ${rateSource === source.value ? styles.rateBtnActive : ''}`}
-              onClick={() => changeRateSource(source.value)}
-            >
-              {source.label}
-            </button>
-          ))}
-          <input
-            className="input"
-            type="number"
-            min="0"
-            step="0.01"
-            value={rateValue}
-            onChange={(e) => applyRateValue(e.target.value)}
-            placeholder="Tasa Bs/USD"
-            style={{ maxWidth: 140 }}
-          />
-        </div>
-        {!parseNumber(rateValue) ? (
-          <p className="tiny muted mb-2">
-            Puedes cobrar en USD sin tasa. Para bolívares, escribe la tasa Bs/USD.
-          </p>
-        ) : null}
-
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <p className="label" style={{ margin: 0 }}>Métodos de pago</p>
-          <button type="button" className="btn btn-sm btn-ghost" onClick={clearPayments}>
-            Limpiar pagos
-          </button>
-        </div>
-        <div className={styles.paymentPanel}>
-          {paymentMethods.map((method) => {
-            const Icon = methodIcon(method.code)
-            const payment = paymentFor(method.id)
-            const isCashUsd = method.affects_cash && method.currency === 'USD'
-            const amount = payment?.amount ?? ''
-            const amountUsd = Number(payment?.amountUsd) || 0
-            return (
-              <div className={styles.methodPanel} key={method.id} data-method={method.code}>
-                <div className={styles.methodPanelHead}>
-                  <span className="flex items-center gap-2">
-                    <Icon size={15} style={{ color: 'var(--orange)' }} />
-                    <strong className={styles.paymentMethodName}>{method.name}</strong>
-                  </span>
-                  <span className={styles.paymentMethodMeta}>
-                    {method.currency === 'BS' ? 'Bolívares' : method.currency}
-                    {method.affects_cash ? ' · caja' : ''}
-                  </span>
-                </div>
-
-                {isCashUsd ? (
-                  <div>
-                    <BillPicker
-                      value={payment?.bills || emptyBillCounts()}
-                      onChange={(bills) => setPaymentBills(method, bills)}
-                      compact
-                      label=""
-                      showTotal={false}
-                      showClear={false}
-                    />
-                    <p className="tiny muted mt-1">
-                      Entrega: {money(amountUsd)} ·{' '}
-                      {sumBills(payment?.bills || {}) > 0
-                        ? 'Billetes recibidos'
-                        : 'Toca los billetes que entrega el cliente'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className={styles.methodPanelInput}>
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setPaymentAmount(method, e.target.value)}
-                      placeholder={
-                        method.currency === 'BS'
-                          ? 'Bs 0,00'
-                          : method.currency === 'USDT'
-                            ? 'USDT 0,00'
-                            : '$0,00'
-                      }
-                    />
-                    {method.currency === 'BS' && amountUsd > 0 ? (
-                      <span className="tiny muted">≈ {money(amountUsd)}</span>
-                    ) : null}
-                  </div>
-                )}
-
-                <div className={styles.methodPanelReference}>
-                  <input
-                    className="input"
-                    value={payment?.reference || ''}
-                    onChange={(e) => setPaymentReference(method, e.target.value)}
-                    placeholder={
-                      method.requires_reference
-                        ? 'Referencia obligatoria'
-                        : 'Referencia (opcional)'
-                    }
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {changeDue > 0.011 ? (
-          <div className="mt-2">
-            <VueltoMixto
-              changeDue={changeDue}
-              drawer={sessionDrawer}
-              rate={rateNumber}
-              value={changeValue}
-              onChange={setChangeValue}
-              disabled={submitting}
-            />
-          </div>
-        ) : null}
-        {changeDue > 0.011 && cashPayments.length === 0 ? (
-          <p className="small negative mt-1">
-            El vuelto solo se puede dar desde un pago en efectivo.
-          </p>
-        ) : null}
-
-        {!referencesOk ? (
-          <p className="small negative mt-1">
-            Completa las referencias obligatorias de los pagos.
-          </p>
-        ) : null}
-
-        <div className="field mt-3">
-          <label>Nota de la venta</label>
-          <input
-            className="input"
-            value={saleNotes}
-            onChange={(e) => setSaleNotes(e.target.value)}
-            placeholder="Opcional"
-          />
-        </div>
-      </Modal>
-
-      <Modal
         open={openCashOpen}
         onClose={() => setOpenCashOpen(false)}
         title="Abrir caja"
@@ -1666,10 +1681,12 @@ export default function AdminPOS() {
       <Modal
         open={cartOpen}
         onClose={() => setCartOpen(false)}
-        title={`Carrito (${cartCount})`}
+        title="Venta"
         icon={ShoppingCart}
+        wide
+        footer={renderSaleFooter(true)}
       >
-        {renderCart()}
+        {renderSalePanel(true)}
       </Modal>
 
       <Modal
