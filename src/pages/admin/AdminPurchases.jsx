@@ -20,7 +20,7 @@ import BillPicker from '../../components/BillPicker'
 import { useCatalog } from '../../hooks/useCatalog'
 import { supabase } from '../../lib/supabase'
 import { refreshCatalog } from '../../lib/catalog'
-import { BASE_UNIT_LABELS, RATE_SOURCES } from '../../lib/constants'
+import { BASE_UNIT_LABELS } from '../../lib/constants'
 import {
   bs as formatBs,
   convertUsdToBs,
@@ -59,7 +59,6 @@ export default function AdminPurchases() {
     purchase_date: todayISO(),
     supplier_name: '',
     payment_method_id: '',
-    rate_source: 'bcv_eur',
     rate_value: '',
     notes: '',
     items: [newRow()],
@@ -150,7 +149,6 @@ export default function AdminPurchases() {
       purchase_date: todayISO(),
       supplier_name: '',
       payment_method_id: paymentMethods[0]?.id || '',
-      rate_source: 'bcv_eur',
       rate_value: rate ? String(rate) : '',
       notes: '',
       items: [newRow()],
@@ -226,7 +224,7 @@ export default function AdminPurchases() {
         supplier_name: form.supplier_name.trim() || null,
         total_usd: formTotal,
         total_bs: totalBs,
-        rate_source: form.rate_source,
+        rate_source: 'bcv_eur',
         rate_value: rateValue || null,
         payment_method_id: form.payment_method_id || null,
         notes: form.notes.trim() || null,
@@ -255,7 +253,7 @@ export default function AdminPurchases() {
               currency: method.currency,
               amount: -cashAmount,
               amount_usd: -formTotal,
-              rate_source: form.rate_source,
+              rate_source: 'bcv_eur',
               rate_value: rateValue,
             },
             notes: `Compra ${form.supplier_name || ''}`.trim(),
@@ -419,9 +417,9 @@ export default function AdminPurchases() {
           </div>
         </div>
 
-        <div className="form-grid-3 mt-2">
+        <div className="form-grid mt-2">
           <div className="field">
-            <label>Tasa Bs/USD (referencia)</label>
+            <label>Tasa EUR (Bs/€)</label>
             <input
               className="input"
               type="number"
@@ -430,18 +428,6 @@ export default function AdminPurchases() {
               value={form.rate_value}
               onChange={(e) => set('rate_value', e.target.value)}
             />
-          </div>
-          <div className="field">
-            <label>Fuente de tasa</label>
-            <select
-              className="select"
-              value={form.rate_source}
-              onChange={(e) => set('rate_source', e.target.value)}
-            >
-              {RATE_SOURCES.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
           </div>
           <div className="field" style={{ justifyContent: 'flex-end' }}>
             <div className="card card-tight" style={{ background: 'var(--cream)', boxShadow: 'none' }}>

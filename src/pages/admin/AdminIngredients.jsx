@@ -479,7 +479,7 @@ export default function AdminIngredients() {
               />
             </div>
             <div className="field">
-              <label>Tasa Bs/USD</label>
+              <label>Tasa EUR (Bs/€)</label>
               <input
                 className="input"
                 type="number"

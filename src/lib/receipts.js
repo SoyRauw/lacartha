@@ -108,8 +108,9 @@ export async function generateReceiptPdf(sale) {
     .join(' · ')
   if (customerLine) doc.text(`Cliente: ${customerLine}`, 14, 70)
   if (rateValue > 0) {
+    const rateUnit = sale.rate_source === 'bcv_eur' ? 'Bs/EUR' : 'Bs/USD'
     doc.text(
-      `Tasa: ${rateLabel(sale.rate_source)} ${formatRate(rateValue)} Bs/USD`,
+      `Tasa: ${rateLabel(sale.rate_source)} ${formatRate(rateValue)} ${rateUnit}`,
       14,
       customerLine ? 76 : 70,
     )

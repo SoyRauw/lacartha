@@ -31,7 +31,7 @@ export function useCatalog() {
         preparation_items,
         payment_methods,
         business,
-        rate,
+        rates,
         lastSync,
       ] = await Promise.all([
         db.products.toArray(),
@@ -44,9 +44,16 @@ export function useCatalog() {
         db.preparation_items.toArray(),
         db.payment_methods.toArray(),
         getSetting('business', {}),
-        db.rate.get('latest'),
+        db.rate.toArray(),
         getSetting('last_catalog_sync', null),
       ])
+
+      const rate =
+        rates.find((row) => row.id === 'latest') ||
+        rates.sort((a, b) =>
+          String(b.snapshot_date || '').localeCompare(String(a.snapshot_date || '')),
+        )[0] ||
+        null
 
       return {
         products,

@@ -193,6 +193,7 @@ h3 {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: margin-left 0.22s ease;
 }
 
 .topbar {
@@ -918,7 +919,7 @@ h3 {
 }
 
 .desktop-only {
-  display: initial;
+  display: inline-flex;
 }
 
 .nav-overlay {
@@ -1055,10 +1056,234 @@ h3 {
 
 @media (max-width: 480px) {
   .stat-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .stat-card {
-    min-height: 92px;
+    min-height: 86px;
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 1.35rem;
+  }
+
+  .stat-label {
+    font-size: 9.5px;
+  }
+
+  .stat-hint {
+    font-size: 9.5px;
+  }
+}
+
+@media (min-width: 861px) {
+  .app-shell.collapsed .sidebar {
+    transform: translateX(-105%);
+  }
+
+  .app-shell.collapsed .main {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 860px) {
+  .input,
+  .select,
+  .textarea {
+    font-size: 16px;
+  }
+
+  .topbar {
+    gap: 8px;
+  }
+
+  .page-actions {
+    width: 100%;
+  }
+
+  .page-actions .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .modal,
+  .modal-wide {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .modal-header {
+    border-radius: 0;
+    padding: 14px 16px;
+  }
+
+  .modal-body {
+    padding: 14px 16px;
+  }
+
+  .modal-footer {
+    border-radius: 0;
+    flex-wrap: wrap;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .modal-footer .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .table-wrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+
+  .table {
+    display: block;
+    min-width: 0 !important;
+    font-size: 13px;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .table tbody tr {
+    display: block;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 12px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .table tbody tr:hover {
+    background: var(--white);
+  }
+
+  .table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 0;
+    text-align: right;
+    min-width: 0;
+  }
+
+  .table td + td {
+    border-top: 1px dashed var(--line);
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 48%;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .table td[data-label='']::before,
+  .table td:not([data-label])::before {
+    display: none;
+  }
+
+  .table td[data-label=''],
+  .table td:not([data-label]) {
+    justify-content: flex-end;
+  }
+
+  .table td > div {
+    min-width: 0;
+  }
+
+  .table td.num {
+    text-align: right;
+  }
+
+  .table td .row-title {
+    text-align: right;
+  }
+
+  .table td .row-meta {
+    text-align: right;
+  }
+
+  .table td[data-form] {
+    display: block;
+    text-align: left;
+  }
+
+  .table td[data-form]::before {
+    display: block;
+    max-width: none;
+    margin-bottom: 5px;
+  }
+
+  .table td[data-form] .row-meta {
+    text-align: left;
+  }
+
+  .table td:has(select),
+  .table td:has(input),
+  .table td:has(textarea) {
+    display: block;
+    text-align: left;
+  }
+
+  .table td:has(select)::before,
+  .table td:has(input)::before,
+  .table td:has(textarea)::before {
+    display: block;
+    max-width: none;
+    margin-bottom: 5px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    padding: 0 10px;
+  }
+
+  .topbar-sub {
+    display: none;
+  }
+
+  .topbar-title {
+    font-size: 13px;
+  }
+
+  .topbar .badge {
+    padding: 4px 7px;
+    font-size: 9.5px;
+  }
+
+  .content {
+    padding: 14px 12px 90px;
   }
 }

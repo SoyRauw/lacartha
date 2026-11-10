@@ -19,7 +19,7 @@ import {
 import BillPicker from '../../components/BillPicker'
 import { useCatalog } from '../../hooks/useCatalog'
 import { supabase } from '../../lib/supabase'
-import { EXPENSE_CATEGORIES, RATE_SOURCES } from '../../lib/constants'
+import { EXPENSE_CATEGORIES } from '../../lib/constants'
 import {
   bs as formatBs,
   convertBsToUsd,
@@ -40,7 +40,6 @@ const EMPTY_FORM = {
   description: '',
   amount: '',
   currency: 'USD',
-  rate_source: 'bcv_eur',
   rate_value: '',
   payment_method_id: '',
   notes: '',
@@ -153,7 +152,6 @@ export default function AdminExpenses() {
       description: expense.description || '',
       amount: String(expense.amount ?? ''),
       currency: expense.currency || 'USD',
-      rate_source: expense.rate_source || 'bcv_eur',
       rate_value: String(expense.rate_value ?? ''),
       payment_method_id: expense.payment_method_id || '',
       notes: expense.notes || '',
@@ -215,7 +213,7 @@ export default function AdminExpenses() {
         amount,
         currency: form.currency,
         amount_usd: amountUsd,
-        rate_source: form.rate_source,
+        rate_source: 'bcv_eur',
         rate_value: parseNumber(form.rate_value) || null,
         payment_method_id: form.payment_method_id || null,
         notes: form.notes.trim() || null,
@@ -245,7 +243,7 @@ export default function AdminExpenses() {
                 currency: form.currency,
                 amount: -amount,
                 amount_usd: -amountUsd,
-                rate_source: form.rate_source,
+                rate_source: 'bcv_eur',
                 rate_value: parseNumber(form.rate_value),
               },
               notes: `Gasto: ${form.description || form.category}`,
@@ -301,7 +299,7 @@ export default function AdminExpenses() {
       <div className="stat-grid mb-3">
         <StatCard icon={Receipt} label="Gastos del mes" value={money(stats.month)} hint={`${stats.count} gasto(s)`} />
         <StatCard icon={Wallet} label="Gastos de hoy" value={money(stats.today)} hint="Registrados hoy" />
-        <StatCard icon={Calculator} label="Tasa BCV EUR" value={catalog.rate?.bcv_eur ? number(catalog.rate.bcv_eur) : '—'} hint="Referencia Bs/USD" />
+        <StatCard icon={Calculator} label="Tasa BCV EUR" value={catalog.rate?.bcv_eur ? number(catalog.rate.bcv_eur) : '—'} hint="Referencia Bs/€" />
       </div>
 
       {error ? <div className="alert alert-error mb-3">{error}</div> : null}
@@ -489,26 +487,16 @@ export default function AdminExpenses() {
         ) : null}
 
         {form.currency === 'BS' ? (
-          <div className="form-grid mt-2">
-            <div className="field">
-              <label>Tasa Bs/USD</label>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.rate_value}
-                onChange={(e) => set('rate_value', e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Fuente</label>
-              <select className="select" value={form.rate_source} onChange={(e) => set('rate_source', e.target.value)}>
-                {RATE_SOURCES.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </div>
+          <div className="field mt-2">
+            <label>Tasa EUR (Bs/€)</label>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.rate_value}
+              onChange={(e) => set('rate_value', e.target.value)}
+            />
           </div>
         ) : null}
 

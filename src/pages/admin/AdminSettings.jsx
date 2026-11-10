@@ -29,8 +29,8 @@ import { supabase } from '../../lib/supabase'
 import { LOGO_URL } from '../../lib/assets'
 import { refreshCatalog, readCatalogFromDb } from '../../lib/catalog'
 import { db } from '../../lib/db'
-import { RATE_SOURCES, BUSINESS_INSTAGRAM_HANDLE, BUSINESS_PHONE } from '../../lib/constants'
-import { money, number, parseNumber, rate as formatRate } from '../../lib/currency'
+import { BUSINESS_INSTAGRAM_HANDLE, BUSINESS_PHONE } from '../../lib/constants'
+import { parseNumber, rate as formatRate } from '../../lib/currency'
 import { ensureDailyRates, saveRateSnapshot } from '../../lib/rates'
 
 const EMPTY_PAYMENT = {
@@ -73,7 +73,6 @@ export default function AdminSettings() {
   const [paymentForm, setPaymentForm] = useState(EMPTY_PAYMENT)
   const [qr, setQr] = useState('')
   const [rates, setRates] = useState({ bcv_usd: '', bcv_eur: '', usdt: '1' })
-  const [publicRateSource, setPublicRateSource] = useState('bcv_eur')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -92,7 +91,6 @@ export default function AdminSettings() {
       if (paymentsRes.error) throw paymentsRes.error
       setBusiness(businessRes.data || null)
       setPaymentMethods(paymentsRes.data || [])
-      setPublicRateSource(businessRes.data?.public_rate_source || 'bcv_eur')
       if (rateRes.data) {
         setRates({
           bcv_usd: rateRes.data.bcv_usd ? String(rateRes.data.bcv_usd) : '',
@@ -142,7 +140,7 @@ export default function AdminSettings() {
           delivery_enabled: business.delivery_enabled !== false,
           pickup_enabled: business.pickup_enabled !== false,
           public_menu_enabled: business.public_menu_enabled !== false,
-          public_rate_source: publicRateSource,
+          public_rate_source: 'bcv_eur',
         })
         .eq('id', 1)
       if (error) throw error
@@ -368,16 +366,18 @@ export default function AdminSettings() {
               />
             </div>
             <div className="field">
-              <label>Tasa por defecto del menú</label>
-              <select
-                className="select"
-                value={publicRateSource}
-                onChange={(e) => setPublicRateSource(e.target.value)}
+              <label>Tasa del menú</label>
+              <div
+                className="input"
+                style={{
+                  background: 'var(--cream)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: 'var(--muted)',
+                }}
               >
-                {RATE_SOURCES.filter((r) => ['bcv_usd', 'bcv_eur'].includes(r.value)).map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
+                BCV EUR (fija)
+              </div>
             </div>
           </div>
           <div className="flex gap-4 mt-2 wrap">
@@ -416,7 +416,7 @@ export default function AdminSettings() {
             <Calculator size={16} /> Tasas del día
           </p>
           <p className="small muted mb-2">
-            Se usan para convertir Bs y mostrar precios. El menú público usa la tasa por defecto.
+            Se usan para convertir Bs y mostrar precios. El menú público y las ventas usan la tasa BCV EUR.
           </p>
           <div className="form-grid-3">
             <div className="field">

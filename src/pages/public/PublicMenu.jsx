@@ -130,16 +130,11 @@ export default function PublicMenu() {
     }
   }, [])
 
-  const source = ['bcv_usd', 'bcv_eur'].includes(business?.public_rate_source)
-    ? business.public_rate_source
-    : 'bcv_eur'
+  const source = 'bcv_eur'
   const rateValue =
-    source === 'manual'
-      ? Number(business?.public_rate_value) || 0
-      : Number(rate?.[source]) ||
-        Number(rate?.bcv_eur) ||
-        Number(rate?.bcv_usd) ||
-        0
+    Number(rate?.bcv_eur) ||
+    Number(rate?.bcv_usd) ||
+    0
 
   const rateDate =
     rate?.source_date || rate?.fetched_at || rate?.snapshot_date || null

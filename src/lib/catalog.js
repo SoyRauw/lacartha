@@ -116,7 +116,7 @@ export async function refreshCatalog() {
       await db.settings.put({ key: 'business', value: catalog.business || {} })
       await db.settings.put({ key: 'last_catalog_sync', value: new Date().toISOString() })
       if (catalog.rate) {
-        await db.rate.put({ id: 'latest', ...catalog.rate })
+        await db.rate.put({ ...catalog.rate, id: 'latest' })
       }
     },
   )

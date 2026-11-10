@@ -12,6 +12,8 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   ReceiptText,
   RefreshCw,
@@ -25,6 +27,7 @@ import {
   X,
 } from 'lucide-react'
 import Logo from './Logo'
+import TableLabels from './TableLabels'
 import { useAuth } from '../hooks/useAuth'
 import { useCatalog } from '../hooks/useCatalog'
 import { useOnline, usePendingCount } from '../hooks/useOnline'
@@ -96,6 +99,13 @@ const TITLES = {
 
 export default function AdminLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('lc-sidebar-collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
   const [syncing, setSyncing] = useState(false)
   const { profile, signOut } = useAuth()
   const { lastSync } = useCatalog()
@@ -109,6 +119,14 @@ export default function AdminLayout() {
   useEffect(() => {
     setMenuOpen(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('lc-sidebar-collapsed', collapsed ? '1' : '0')
+    } catch {
+      // Sin almacenamiento local: el estado vive solo en esta sesión.
+    }
+  }, [collapsed])
 
   useEffect(() => {
     if (!online) return undefined
@@ -165,7 +183,8 @@ export default function AdminLayout() {
     : 'sin sincronizar'
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${collapsed ? 'collapsed' : ''}`}>
+      <TableLabels />
       {menuOpen ? <div className="nav-overlay" onClick={() => setMenuOpen(false)} /> : null}
 
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
@@ -221,6 +240,16 @@ export default function AdminLayout() {
             aria-label="Abrir menú"
           >
             {menuOpen ? <X size={19} /> : <Menu size={19} />}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-icon desktop-only"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? 'Mostrar menú' : 'Ocultar menú'}
+            title={collapsed ? 'Mostrar menú' : 'Ocultar menú'}
+          >
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
 
           <div>

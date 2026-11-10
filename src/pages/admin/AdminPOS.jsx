@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  ArrowDownUp,
   Banknote,
   Calculator,
   CheckCircle2,
+  ChevronLeft,
   CircleDollarSign,
   ClipboardList,
   Cloud,
@@ -56,7 +56,7 @@ import {
   saleItemUnitCost,
   saleItemUnitPrice,
 } from '../../lib/costing'
-import { CATEGORY_LABELS, RATE_SOURCES } from '../../lib/constants'
+import { CATEGORY_LABELS } from '../../lib/constants'
 import {
   bs as formatBs,
   convertBsToUsd,
@@ -64,6 +64,7 @@ import {
   money,
   number,
   parseNumber,
+  rate as formatRate,
 } from '../../lib/currency'
 import { generateOrderNumber } from '../../lib/dates'
 import { db } from '../../lib/db'
@@ -75,7 +76,6 @@ import {
   getOpenLocalSession,
   openLocalCashSession,
 } from '../../lib/localCash'
-import { getRateValue } from '../../lib/rates'
 import { refreshCatalog } from '../../lib/catalog'
 import { downloadReceipt } from '../../lib/receipts'
 import { syncAll, syncCashSession, syncPendingSales } from '../../lib/sync'
@@ -88,8 +88,6 @@ const CATEGORY_TABS = [
   { value: 'postre', label: 'Postres' },
   { value: 'snack', label: 'Snacks' },
 ]
-
-const BS_RATE_SOURCES = RATE_SOURCES.filter((r) => r.value !== 'usdt')
 
 function methodIcon(code) {
   switch (code) {
@@ -131,8 +129,7 @@ export default function AdminPOS() {
     notes: '',
   })
   const [payments, setPayments] = useState([])
-  const [rateSource, setRateSource] = useState('bcv_eur')
-  const [rateValue, setRateValue] = useState('')
+  const [paymentDraft, setPaymentDraft] = useState(null)
   const [saleNotes, setSaleNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [completedSale, setCompletedSale] = useState(null)
@@ -164,7 +161,6 @@ export default function AdminPOS() {
       if (session) {
         const ledger = await getLocalBillLedger(session.id)
         setSessionDrawer(drawerFromLedger(ledger))
-        if (session.exchange_rate) setRateValue(String(session.exchange_rate))
       } else {
         setSessionDrawer(emptyBillCounts())
       }
@@ -178,17 +174,6 @@ export default function AdminPOS() {
   useEffect(() => {
     loadCash()
   }, [loadCash])
-
-  useEffect(() => {
-    if (!rateValue) {
-      const source = catalog.business?.public_rate_source || 'bcv_eur'
-      const validSource = BS_RATE_SOURCES.some((r) => r.value === source) ? source : 'bcv_eur'
-      const value = getRateValue(catalog.rate, validSource)
-      setRateSource(validSource)
-      if (value) setRateValue(String(value))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog.rate, catalog.business])
 
   useEffect(() => {
     if (!comandaId || !catalog.ready || loadedOrderRef.current === comandaId) return undefined
@@ -247,10 +232,6 @@ export default function AdminPOS() {
       setOrderId(data.id)
       setCustomerName(data.customer_name || '')
       setCustomerPhone(data.customer_phone || '')
-      if (Number(data.rate_value) > 0) {
-        setRateValue(String(data.rate_value))
-        setRateSource(data.rate_source || 'bcv_eur')
-      }
       setSaleNotes(
         'Comanda ' +
           data.order_number +
@@ -313,7 +294,9 @@ export default function AdminPOS() {
     () => cart.reduce((sum, item) => sum + Number(item.quantity), 0),
     [cart],
   )
-  const totalBs = convertUsdToBs(total, rateValue)
+  const rateNumber =
+    Number(catalog.rate?.bcv_eur) || Number(catalog.rate?.bcv_usd) || 0
+  const totalBs = convertUsdToBs(total, rateNumber)
 
   const configGroups = useMemo(
     () => (configProduct ? groupsForProduct(configProduct, ctx) : []),
@@ -367,11 +350,7 @@ export default function AdminPOS() {
   )
   const remaining = Math.max(0, total - paidUsd)
   const changeDue = Math.max(0, paidUsd - total)
-  const rateNumber = parseNumber(rateValue) || 0
   const cashPayments = activePayments.filter((p) => p.method.affects_cash)
-  const referencesOk = activePayments.every(
-    (p) => !p.method.requires_reference || p.reference.trim().length > 0,
-  )
   const customerOk =
     customerName.trim().length >= 2 &&
     customerPhone.replace(/\D/g, '').length >= 7
@@ -382,7 +361,6 @@ export default function AdminPOS() {
     activePayments.length > 0 &&
     customerOk &&
     remaining <= 0.011 &&
-    referencesOk &&
     changeCovered
   const saleHint = !cart.length
     ? 'Agrega productos para empezar'
@@ -390,14 +368,14 @@ export default function AdminPOS() {
       ? 'Completa nombre y teléfono'
       : !cashSession
         ? 'Abre la caja para cobrar'
-        : activePayments.length === 0
-          ? 'Escribe el monto de al menos un pago'
-          : remaining > 0.011
-            ? 'Faltan ' + money(remaining)
-            : changeDue > 0.011 && !changeCovered
-              ? 'Completa el vuelto'
-              : !referencesOk
-                ? 'Completa las referencias obligatorias'
+        : paymentDraft && Number(paymentDraft.amountUsd) > 0
+          ? 'Toca Agregar pago para confirmar'
+          : activePayments.length === 0
+            ? 'Selecciona el método de pago'
+            : remaining > 0.011
+              ? 'Faltan ' + money(remaining)
+              : changeDue > 0.011 && !changeCovered
+                ? 'Completa el vuelto'
                 : 'Listo para finalizar'
 
   useEffect(() => {
@@ -510,6 +488,9 @@ export default function AdminPOS() {
     if (!cart.length) return
     if (!window.confirm('¿Vaciar el carrito?')) return
     setCart([])
+    setPayments([])
+    setPaymentDraft(null)
+    setChangeValue(emptyChange())
   }
 
   const handleOpenCash = async () => {
@@ -517,7 +498,7 @@ export default function AdminPOS() {
       const session = await openLocalCashSession({
         opening_bills: openingBills,
         opening_bs: parseNumber(openingBs),
-        exchange_rate: parseNumber(rateValue) || null,
+        exchange_rate: rateNumber || null,
         user_id: user?.id || null,
       })
       setCashSession(session)
@@ -543,6 +524,9 @@ export default function AdminPOS() {
     setCustomerName('')
     setCustomerPhone('')
     setCart([])
+    setPayments([])
+    setPaymentDraft(null)
+    setChangeValue(emptyChange())
     setSaleNotes('')
     loadedOrderRef.current = null
     setSearchParams({})
@@ -551,89 +535,91 @@ export default function AdminPOS() {
   const paymentFor = (methodId) =>
     payments.find((payment) => payment.method.id === methodId) || null
 
-  const upsertPayment = (method, patch) => {
-    setPayments((prev) => {
-      const existing = prev.find((payment) => payment.method.id === method.id)
-      const base = existing || {
-        key: crypto.randomUUID(),
-        method,
-        amount: '',
-        amountUsd: 0,
-        reference: '',
-        bills:
-          method.affects_cash && method.currency === 'USD'
-            ? emptyBillCounts()
-            : null,
-      }
-      const next = { ...base, ...patch }
-      const hasMoney =
-        Number(next.amountUsd) > 0 ||
-        Number(next.amount) > 0 ||
-        sumBills(next.bills || {}) > 0
-      const hasReference = String(next.reference || '').trim().length > 0
-      if (!hasMoney && !hasReference) {
-        return prev.filter((payment) => payment.method.id !== method.id)
-      }
-      if (existing) {
-        return prev.map((payment) =>
-          payment.method.id === method.id ? next : payment,
-        )
-      }
-      return [...prev, next]
+  const isCashUsdMethod = (method) =>
+    method.affects_cash === true && method.currency === 'USD'
+
+  const startPaymentDraft = (method) => {
+    const existing = paymentFor(method.id)
+    setPaymentDraft({
+      key: existing?.key || crypto.randomUUID(),
+      method,
+      amount: existing?.amount ?? '',
+      amountUsd: existing?.amountUsd ?? 0,
+      reference: existing?.reference || '',
+      bills:
+        existing?.bills ||
+        (isCashUsdMethod(method) ? emptyBillCounts() : null),
     })
   }
 
-  const setPaymentAmount = (method, value) => {
-    const rate = parseNumber(rateValue) || 0
-    const amount = parseNumber(value)
-    if (method.currency === 'BS' && amount > 0 && rate <= 0) {
-      push('Escribe la tasa Bs/USD para cobrar en bolívares', 'error')
+  const updateDraftAmount = (value) => {
+    setPaymentDraft((prev) => {
+      if (!prev) return prev
+      const amount = parseNumber(value)
+      if (prev.method.currency === 'BS' && amount > 0 && rateNumber <= 0) {
+        push('No hay tasa EUR del día. Sincroniza para cobrar en Bs.', 'error')
+        return prev
+      }
+      const amountUsd =
+        prev.method.currency === 'BS'
+          ? convertBsToUsd(amount, rateNumber)
+          : amount
+      return { ...prev, amount: value, amountUsd: Number(amountUsd.toFixed(4)) }
+    })
+  }
+
+  const updateDraftBills = (counts) => {
+    const totalBills = sumBills(counts)
+    setPaymentDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            bills: counts,
+            amount: totalBills ? totalBills.toFixed(2) : '',
+            amountUsd: totalBills,
+          }
+        : prev,
+    )
+  }
+
+  const fillExactAmount = () => {
+    if (!paymentDraft) return
+    const existing = paymentFor(paymentDraft.method.id)
+    const targetUsd = remaining + (Number(existing?.amountUsd) || 0)
+    if (paymentDraft.method.currency === 'BS') {
+      if (rateNumber <= 0) {
+        push('No hay tasa EUR del día. Sincroniza para cobrar en Bs.', 'error')
+        return
+      }
+      updateDraftAmount(convertUsdToBs(targetUsd, rateNumber).toFixed(2))
       return
     }
-    const amountUsd =
-      method.currency === 'BS' ? convertBsToUsd(amount, rate) : amount
-    upsertPayment(method, {
-      amount: value,
-      amountUsd: Number(amountUsd.toFixed(4)),
-      bills: null,
-    })
+    updateDraftAmount(targetUsd.toFixed(2))
   }
 
-  const setPaymentBills = (method, counts) => {
-    const totalBills = sumBills(counts)
-    upsertPayment(method, {
-      bills: counts,
-      amount: totalBills ? totalBills.toFixed(2) : '',
-      amountUsd: totalBills,
-    })
+  const savePaymentDraft = () => {
+    if (!paymentDraft) return
+    if ((Number(paymentDraft.amountUsd) || 0) <= 0) {
+      push('Escribe el monto del pago', 'error')
+      return
+    }
+    const { method } = paymentDraft
+    setPayments((prev) => [
+      ...prev.filter((payment) => payment.method.id !== method.id),
+      paymentDraft,
+    ])
+    setPaymentDraft(null)
   }
 
-  const setPaymentReference = (method, value) => {
-    upsertPayment(method, { reference: value })
+  const removePayment = (methodId) => {
+    setPayments((prev) => prev.filter((payment) => payment.method.id !== methodId))
+    setPaymentDraft((prev) => (prev?.method.id === methodId ? null : prev))
   }
 
   const clearPayments = () => {
     setPayments([])
+    setPaymentDraft(null)
     setChangeValue(emptyChange())
-  }
-
-  const changeRateSource = (source) => {
-    setRateSource(source)
-    const value = getRateValue(catalog.rate, source)
-    if (value) applyRateValue(String(value))
-  }
-
-  const applyRateValue = (value) => {
-    setRateValue(value)
-    const rate = parseNumber(value) || 0
-    if (rate <= 0) return
-    setPayments((prev) =>
-      prev.map((p) => {
-        if (p.method.currency !== 'BS') return p
-        const amountUsd = Number(p.amountUsd) || 0
-        return { ...p, amount: convertUsdToBs(amountUsd, rate).toFixed(2) }
-      }),
-    )
   }
 
   const handleCharge = async () => {
@@ -652,8 +638,6 @@ export default function AdminPOS() {
     if (!canCharge) {
       if (changeDue > 0.011 && !changeCovered) {
         push('Completa el vuelto para poder cobrar', 'error')
-      } else if (!referencesOk) {
-        push('Completa las referencias obligatorias de los pagos', 'error')
       } else {
         push('Faltan pagos por cubrir', 'error')
       }
@@ -664,7 +648,7 @@ export default function AdminPOS() {
     try {
       const clientId = crypto.randomUUID()
       const orderNumber = generateOrderNumber()
-      const rate = parseNumber(rateValue) || 0
+      const rate = rateNumber
       const now = new Date().toISOString()
 
       const itemsPayload = cart.map((item) => {
@@ -749,7 +733,7 @@ export default function AdminPOS() {
               ? billsToJson(p.bills || {})
               : null,
           change_bills: isTarget ? billsToJson(changeValue.bills || {}) : null,
-          rate_source: rateSource,
+          rate_source: 'bcv_eur',
           rate_value: rate,
           reference: p.reference || null,
           affects_cash: p.method.affects_cash === true,
@@ -767,7 +751,7 @@ export default function AdminPOS() {
         total_bs: convertUsdToBs(total, rate),
         change_usd: changeUsd,
         change_bs: changeBs,
-        rate_source: rateSource,
+        rate_source: 'bcv_eur',
         rate_value: rate,
         customer_name: customerName.trim() || null,
         customer_phone: customerPhone.trim() || null,
@@ -874,6 +858,7 @@ export default function AdminPOS() {
       setCompletedSale(receiptSale)
       setCart([])
       setPayments([])
+      setPaymentDraft(null)
       setSaleNotes('')
       setCartOpen(false)
       setChangeValue(emptyChange())
@@ -953,12 +938,137 @@ export default function AdminPOS() {
     </div>
   )
 
+  const renderPaymentMethods = () => (
+    <div className={styles.methodGrid}>
+      {paymentMethods.map((method) => {
+        const Icon = methodIcon(method.code)
+        const added = Boolean(paymentFor(method.id))
+        return (
+          <button
+            key={method.id}
+            type="button"
+            className={styles.methodBtn + (added ? ' ' + styles.methodBtnAdded : '')}
+            onClick={() => startPaymentDraft(method)}
+          >
+            <span className={styles.methodIcon}>
+              <Icon size={18} />
+            </span>
+            <span className={styles.methodInfo}>
+              <strong>{method.name}</strong>
+              <span>
+                {method.currency === 'BS' ? 'Bolívares' : method.currency}
+                {method.affects_cash ? ' · caja' : ''}
+              </span>
+            </span>
+            {added ? <CheckCircle2 size={15} className={styles.methodCheck} /> : null}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const renderPaymentDraft = () => {
+    if (!paymentDraft) return null
+    const method = paymentDraft.method
+    const Icon = methodIcon(method.code)
+    const cashUsd = isCashUsdMethod(method)
+    const amountUsd = Number(paymentDraft.amountUsd) || 0
+    return (
+      <div className={styles.payEditor}>
+        <div className={styles.payEditorHead}>
+          <span className={styles.payEditorTitle}>
+            <Icon size={18} style={{ color: 'var(--orange)' }} />
+            <strong>{method.name}</strong>
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={() => setPaymentDraft(null)}
+          >
+            <ChevronLeft size={14} /> Volver
+          </button>
+        </div>
+
+        {cashUsd ? (
+          <>
+            <BillPicker
+              value={paymentDraft.bills || emptyBillCounts()}
+              onChange={updateDraftBills}
+              compact
+              label=""
+              showTotal={false}
+              showClear={false}
+            />
+            <p className={styles.payReceived}>
+              Recibido <strong>{money(amountUsd)}</strong>
+            </p>
+          </>
+        ) : (
+          <>
+            <label className={styles.payAmountLabel} htmlFor="pos-payment-amount">
+              Monto en {method.currency === 'BS' ? 'bolívares' : method.currency}
+            </label>
+            <input
+              id="pos-payment-amount"
+              className={styles.payAmountInput}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              value={paymentDraft.amount}
+              onChange={(e) => updateDraftAmount(e.target.value)}
+              placeholder="0,00"
+              autoFocus
+            />
+            <div className={styles.payAmountMeta}>
+              <span>
+                {method.currency === 'BS'
+                  ? '≈ ' + money(amountUsd)
+                  : 'USD ' + number(amountUsd)}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={fillExactAmount}
+                disabled={remaining <= 0.011}
+              >
+                Usar exacto
+              </button>
+            </div>
+          </>
+        )}
+
+        {method.requires_reference ? (
+          <input
+            className={'input ' + styles.payRefInput}
+            value={paymentDraft.reference}
+            onChange={(e) =>
+              setPaymentDraft((prev) =>
+                prev ? { ...prev, reference: e.target.value } : prev,
+              )
+            }
+            placeholder="Referencia (opcional)"
+          />
+        ) : null}
+
+        <button
+          type="button"
+          className="btn btn-primary btn-lg btn-block"
+          onClick={savePaymentDraft}
+        >
+          <CheckCircle2 size={16} />
+          {paymentFor(method.id) ? 'Guardar pago' : 'Agregar pago'}
+        </button>
+      </div>
+    )
+  }
+
   const renderSalePanel = (mobile = false) => {
     return (
       <div className={styles.salePanel + (mobile ? ' ' + styles.salePanelMobile : '')}>
         <div className={styles.saleHeader}>
           <div className={styles.saleHeaderTitle}>
-            <ShoppingCart size={18} style={{ color: 'var(--orange)' }} />
+            <ShoppingCart size={19} style={{ color: 'var(--orange)' }} />
             <div>
               <h3>Venta actual</h3>
               <p className="tiny muted">
@@ -988,16 +1098,16 @@ export default function AdminPOS() {
         </div>
 
         <div className={styles.saleBody}>
-          <div className={styles.saleLeft}>
-            <section className={styles.saleSection}>
-              <div className={styles.sectionHead}>
-                <span className={styles.sectionTitle}>
-                  <User size={13} /> Cliente
-                </span>
-                <span className={'badge ' + (customerOk ? 'badge-green' : 'badge-yellow')}>
-                  {customerOk ? 'Listo' : 'Faltan datos'}
-                </span>
-              </div>
+          <section className={styles.saleSection}>
+            <div className={styles.sectionHead}>
+              <span className={styles.sectionTitle}>
+                <User size={14} /> Cliente
+              </span>
+              <span className={'badge ' + (customerOk ? 'badge-green' : 'badge-yellow')}>
+                {customerOk ? 'Listo' : 'Faltan datos'}
+              </span>
+            </div>
+            <div className={styles.customerGrid}>
               <div className={styles.fieldRow}>
                 <label>Nombre *</label>
                 <input
@@ -1017,55 +1127,156 @@ export default function AdminPOS() {
                   placeholder="0414-0000000"
                 />
               </div>
-              {orderData ? (
-                <p className="tiny muted">
-                  {orderData.fulfillment === 'delivery'
-                    ? 'Delivery: ' +
-                      (orderData.address || 'sin dirección') +
-                      ' · costo por cotizar'
-                    : 'Comer aquí · paga en caja'}
-                </p>
-              ) : null}
-            </section>
+            </div>
+            {orderData ? (
+              <p className="tiny muted">
+                {orderData.fulfillment === 'delivery'
+                  ? 'Delivery: ' +
+                    (orderData.address || 'sin dirección') +
+                    ' · costo por cotizar'
+                  : 'Comer aquí · paga en caja'}
+              </p>
+            ) : null}
+          </section>
 
-            <section className={styles.saleSection}>
-              <div className={styles.sectionHead}>
-                <span className={styles.sectionTitle}>
-                  <ArrowDownUp size={13} /> Tasa Bs/USD
-                </span>
-                <strong className={styles.rateNumber}>{number(rateValue)}</strong>
+          <section className={styles.saleSection + ' ' + styles.itemsSection}>
+            <div className={styles.sectionHead}>
+              <span className={styles.sectionTitle}>
+                <ShoppingCart size={14} /> Productos
+              </span>
+              <span className="tiny muted">
+                {cartCount} artículo{cartCount === 1 ? '' : 's'}
+              </span>
+            </div>
+            {cart.length === 0 ? (
+              <div className={styles.saleEmpty}>
+                <ShoppingCart size={26} />
+                <p>Toca un producto para empezar.</p>
               </div>
-              <div className={styles.rateOptions}>
-                {BS_RATE_SOURCES.map((source) => (
-                  <button
-                    key={source.value}
-                    type="button"
-                    className={
-                      styles.rateBtn +
-                      (rateSource === source.value ? ' ' + styles.rateBtnActive : '')
-                    }
-                    onClick={() => changeRateSource(source.value)}
-                  >
-                    {source.label}
-                  </button>
+            ) : (
+              <div className={styles.itemsList}>
+                {cart.map((item) => (
+                  <div className={styles.saleItem} key={item.key}>
+                    <div className={styles.saleItemBody}>
+                      <div className={styles.saleItemName}>{item.product.name}</div>
+                      {item.selectedOptions.length ? (
+                        <div className={styles.saleItemMeta}>
+                          {optionNames(item.selectedOptions).join(' · ')}
+                        </div>
+                      ) : null}
+                      {item.notes ? (
+                        <div className={styles.saleItemMeta}>Nota: {item.notes}</div>
+                      ) : null}
+                      <div className={styles.saleItemBottom}>
+                        <div className={styles.qtyControls}>
+                          <button
+                            type="button"
+                            className={styles.qtyBtn}
+                            onClick={() => updateQty(item.key, -1)}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className={styles.qtyValue}>{item.quantity}</span>
+                          <button
+                            type="button"
+                            className={styles.qtyBtn}
+                            onClick={() => updateQty(item.key, 1)}
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                        <span className={styles.saleItemPrice}>
+                          {money(item.unitPrice)} c/u
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.saleItemRight}>
+                      <strong>
+                        {money(Number(item.unitPrice) * Number(item.quantity))}
+                      </strong>
+                      <button
+                        type="button"
+                        className={styles.saleItemRemove}
+                        onClick={() => removeItem(item.key)}
+                        aria-label="Quitar"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
-              <input
-                className="input mt-2"
-                type="number"
-                min="0"
-                step="0.01"
-                value={rateValue}
-                onChange={(e) => applyRateValue(e.target.value)}
-                placeholder="Tasa Bs/USD"
-              />
-            </section>
+            )}
+          </section>
 
-            <section className={styles.saleSection}>
-              <div className={styles.sectionHead}>
-                <span className={styles.sectionTitle}>
-                  <Wallet size={13} /> Pagos
-                </span>
+          <section className={styles.saleSection}>
+            <div className={styles.sectionHead}>
+              <span className={styles.sectionTitle}>Resumen</span>
+              <span className={styles.rateHint}>
+                {rateNumber > 0
+                  ? 'Tasa EUR hoy · ' + formatRate(rateNumber) + ' Bs/€'
+                  : 'Sin tasa EUR del día'}
+              </span>
+            </div>
+            <div className={styles.summaryTotal}>
+              <span>Total</span>
+              <strong>{money(total)}</strong>
+            </div>
+            <div className={styles.summaryRow}>
+              <span>Total en Bs</span>
+              <strong>{rateNumber > 0 ? formatBs(totalBs) : '—'}</strong>
+            </div>
+            {total > 0 ? (
+              <>
+                <div className={styles.summaryRow}>
+                  <span>Pagado</span>
+                  <strong>{money(paidUsd)}</strong>
+                </div>
+                {changeDue > 0.011 ? (
+                  <div className={styles.summaryChange}>
+                    <span>Vuelto</span>
+                    <strong>{money(changeDue)}</strong>
+                  </div>
+                ) : remaining > 0.011 ? (
+                  <div className={styles.summaryMissing}>
+                    <span>Faltante</span>
+                    <strong>{money(remaining)}</strong>
+                  </div>
+                ) : (
+                  <div className={styles.summaryOk}>
+                    <span>Cubierto</span>
+                    <strong>Listo</strong>
+                  </div>
+                )}
+              </>
+            ) : null}
+            {changeDue > 0.011 ? (
+              <VueltoMixto
+                changeDue={changeDue}
+                drawer={sessionDrawer}
+                rate={rateNumber}
+                value={changeValue}
+                onChange={setChangeValue}
+                disabled={submitting}
+              />
+            ) : null}
+            <div className={styles.fieldRow} style={{ marginTop: 8 }}>
+              <label>Nota de la venta</label>
+              <input
+                className="input"
+                value={saleNotes}
+                onChange={(e) => setSaleNotes(e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+          </section>
+
+          <section className={styles.saleSection}>
+            <div className={styles.sectionHead}>
+              <span className={styles.sectionTitle}>
+                <Wallet size={14} /> Pago
+              </span>
+              {payments.length ? (
                 <button
                   type="button"
                   className="btn btn-sm btn-ghost"
@@ -1073,204 +1284,55 @@ export default function AdminPOS() {
                 >
                   Limpiar
                 </button>
-              </div>
-              <div className={styles.paymentList}>
-                {paymentMethods.map((method) => {
-                  const Icon = methodIcon(method.code)
-                  const payment = paymentFor(method.id)
-                  const isCashUsd = method.affects_cash && method.currency === 'USD'
-                  const amount = payment?.amount ?? ''
-                  const amountUsd = Number(payment?.amountUsd) || 0
-                  return (
-                    <div
-                      className={styles.paymentRow}
-                      key={method.id}
-                      data-method={method.code}
-                    >
-                      <div className={styles.paymentHead}>
-                        <span className="flex items-center gap-2">
-                          <Icon size={14} style={{ color: 'var(--orange)' }} />
-                          <strong>{method.name}</strong>
-                        </span>
-                        <span className={styles.paymentCurrency}>
-                          {method.currency === 'BS' ? 'Bs' : method.currency}
-                          {method.affects_cash ? ' · caja' : ''}
-                        </span>
-                      </div>
-                      {isCashUsd ? (
-                        <div>
-                          <BillPicker
-                            value={payment?.bills || emptyBillCounts()}
-                            onChange={(bills) => setPaymentBills(method, bills)}
-                            compact
-                            label=""
-                            showTotal={false}
-                            showClear={false}
-                          />
-                          <p className="tiny muted mt-1">
-                            Entrega: {money(amountUsd)}
-                          </p>
-                        </div>
-                      ) : (
-                        <input
-                          className={'input ' + styles.paymentInput}
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={amount}
-                          onChange={(e) => setPaymentAmount(method, e.target.value)}
-                          placeholder={
-                            method.currency === 'BS'
-                              ? 'Bs 0,00'
-                              : method.currency === 'USDT'
-                                ? 'USDT 0,00'
-                                : '$0,00'
-                          }
-                        />
-                      )}
-                      {method.requires_reference ? (
-                        <input
-                          className={'input ' + styles.paymentRef}
-                          value={payment?.reference || ''}
-                          onChange={(e) => setPaymentReference(method, e.target.value)}
-                          placeholder="Referencia obligatoria"
-                        />
-                      ) : null}
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          </div>
-
-          <div className={styles.saleRight}>
-            <section className={styles.saleSection + ' ' + styles.itemsSection}>
-              <div className={styles.sectionHead}>
-                <span className={styles.sectionTitle}>
-                  <ShoppingCart size={13} /> Productos
-                </span>
-                <span className="tiny muted">
-                  {cartCount} artículo{cartCount === 1 ? '' : 's'}
-                </span>
-              </div>
-              {cart.length === 0 ? (
-                <div className={styles.saleEmpty}>
-                  <ShoppingCart size={26} />
-                  <p>Toca un producto para empezar.</p>
-                </div>
-              ) : (
-                <div className={styles.itemsList}>
-                  {cart.map((item) => (
-                    <div className={styles.saleItem} key={item.key}>
-                      <div className={styles.saleItemBody}>
-                        <div className={styles.saleItemName}>{item.product.name}</div>
-                        {item.selectedOptions.length ? (
-                          <div className={styles.saleItemMeta}>
-                            {optionNames(item.selectedOptions).join(' · ')}
-                          </div>
-                        ) : null}
-                        {item.notes ? (
-                          <div className={styles.saleItemMeta}>Nota: {item.notes}</div>
-                        ) : null}
-                        <div className={styles.saleItemBottom}>
-                          <div className={styles.qtyControls}>
-                            <button
-                              type="button"
-                              className={styles.qtyBtn}
-                              onClick={() => updateQty(item.key, -1)}
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <span className={styles.qtyValue}>{item.quantity}</span>
-                            <button
-                              type="button"
-                              className={styles.qtyBtn}
-                              onClick={() => updateQty(item.key, 1)}
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
-                          <span className={styles.saleItemPrice}>
-                            {money(item.unitPrice)} c/u
-                          </span>
-                        </div>
-                      </div>
-                      <div className={styles.saleItemRight}>
-                        <strong>
-                          {money(Number(item.unitPrice) * Number(item.quantity))}
-                        </strong>
-                        <button
-                          type="button"
-                          className={styles.saleItemRemove}
-                          onClick={() => removeItem(item.key)}
-                          aria-label="Quitar"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className={styles.saleSection}>
-              <div className={styles.sectionHead}>
-                <span className={styles.sectionTitle}>Resumen</span>
-              </div>
-              <div className={styles.summaryRow}>
-                <span>Subtotal</span>
-                <strong>{money(total)}</strong>
-              </div>
-              <div className={styles.summaryRow}>
-                <span>Total Bs</span>
-                <strong>{formatBs(totalBs)}</strong>
-              </div>
-              <div className={styles.summaryTotal}>
-                <span>Total</span>
-                <strong>{money(total)}</strong>
-              </div>
-              <div className={styles.summaryRow}>
-                <span>Pagado</span>
-                <strong>{money(paidUsd)}</strong>
-              </div>
-              {changeDue > 0.011 ? (
-                <div className={styles.summaryChange}>
-                  <span>Vuelto</span>
-                  <strong>{money(changeDue)}</strong>
-                </div>
-              ) : remaining > 0.011 ? (
-                <div className={styles.summaryMissing}>
-                  <span>Faltante</span>
-                  <strong>{money(remaining)}</strong>
-                </div>
-              ) : (
-                <div className={styles.summaryOk}>
-                  <span>Cubierto</span>
-                  <strong>Listo</strong>
-                </div>
-              )}
-              {changeDue > 0.011 ? (
-                <VueltoMixto
-                  changeDue={changeDue}
-                  drawer={sessionDrawer}
-                  rate={rateNumber}
-                  value={changeValue}
-                  onChange={setChangeValue}
-                  disabled={submitting}
-                />
               ) : null}
-              <div className={styles.fieldRow} style={{ marginTop: 8 }}>
-                <label>Nota de la venta</label>
-                <input
-                  className="input"
-                  value={saleNotes}
-                  onChange={(e) => setSaleNotes(e.target.value)}
-                  placeholder="Opcional"
-                />
+            </div>
+
+            {activePayments.length ? (
+              <div className={styles.addedPayments}>
+                {activePayments.map((payment) => (
+                  <div className={styles.addedPayment} key={payment.key}>
+                    <div>
+                      <strong>{payment.method.name}</strong>
+                      <span>
+                        {payment.method.currency === 'BS'
+                          ? formatBs(payment.amount)
+                          : payment.method.currency + ' ' + number(payment.amount)}
+                        {payment.reference ? ' · ' + payment.reference : ''}
+                      </span>
+                    </div>
+                    <div className={styles.addedPaymentRight}>
+                      <strong>{money(payment.amountUsd)}</strong>
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        onClick={() => removePayment(payment.method.id)}
+                        aria-label={'Quitar ' + payment.method.name}
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </section>
-          </div>
+            ) : null}
+
+            {paymentDraft ? (
+              renderPaymentDraft()
+            ) : remaining > 0.011 || activePayments.length === 0 ? (
+              <>
+                <p className={styles.payStep}>
+                  {activePayments.length
+                    ? 'Agrega otro método de pago'
+                    : 'Selecciona el método de pago'}
+                </p>
+                {renderPaymentMethods()}
+              </>
+            ) : (
+              <div className={styles.payDone}>
+                <CheckCircle2 size={18} /> Pago completo
+              </div>
+            )}
+          </section>
         </div>
 
         {!mobile ? renderSaleFooter(false) : null}
@@ -1661,16 +1723,10 @@ export default function AdminPOS() {
             />
           </div>
           <div className="field">
-            <label>Tasa del turno (Bs/USD)</label>
-            <input
-              className="input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={rateValue}
-              onChange={(e) => setRateValue(e.target.value)}
-              placeholder="Tasa BCV EUR"
-            />
+            <label>Tasa EUR del día</label>
+            <div className={styles.rateReadonly}>
+              {rateNumber > 0 ? formatRate(rateNumber) + ' Bs/€' : 'Sin tasa disponible'}
+            </div>
           </div>
         </div>
         <p className="small muted mt-2">

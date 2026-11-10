@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownRight,
-  ArrowDownUp,
   ArrowUpRight,
   Banknote,
   CheckCircle2,
@@ -48,7 +47,7 @@ import {
   formatBillsList,
   sumBills,
 } from '../../lib/bills'
-import { bs as formatBs, money, number, parseNumber } from '../../lib/currency'
+import { bs as formatBs, money, number, parseNumber, rate as formatRate } from '../../lib/currency'
 import { formatDate, formatDateTime, todayISO } from '../../lib/dates'
 import { getRateValue } from '../../lib/rates'
 import { supabase } from '../../lib/supabase'
@@ -277,27 +276,6 @@ export default function AdminCash() {
     }
   }
 
-  const useCurrentRate = async () => {
-    let value =
-      getRateValue(catalog.rate, 'bcv_eur') ||
-      getRateValue(catalog.rate, 'bcv_usd') ||
-      getRateValue(catalog.rate, 'usdt')
-    if (!value && online) {
-      const { data } = await supabase
-        .from('rate_snapshots')
-        .select('*')
-        .order('snapshot_date', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      value = data?.bcv_eur || data?.bcv_usd || data?.usdt
-    }
-    if (!value) {
-      push('No hay tasa del día. Actualízala en Ajustes.', 'error')
-      return
-    }
-    setExchangeRate(String(value))
-  }
-
   const bringLastClose = async () => {
     try {
       const localClosed = await db.cash_sessions.where('status').equals('closed').toArray()
@@ -356,7 +334,7 @@ export default function AdminCash() {
   const handleOpen = async () => {
     const rate = parseNumber(exchangeRate)
     if (rate <= 0) {
-      push('Escribe la tasa del turno en Bs/USD', 'error')
+      push('Escribe la tasa EUR del día en Bs/€', 'error')
       return
     }
     setSaving(true)
@@ -551,7 +529,7 @@ export default function AdminCash() {
           <EmptyState
             icon={Wallet}
             title="No hay caja abierta"
-            text="Abre la caja contando los billetes y definiendo la tasa del turno."
+            text="Abre la caja contando los billetes. La tasa EUR del día se toma automáticamente."
             action={
               <button type="button" className="btn btn-primary" onClick={() => setOpenModal(true)}>
                 <Unlock size={15} /> Abrir caja
@@ -592,7 +570,7 @@ export default function AdminCash() {
               icon={Wallet}
               label="Total esperado"
               value={money(expected.expectedTotalUsd)}
-              hint="USD + Bs a la tasa del turno"
+              hint="USD + Bs a la tasa EUR del día"
             />
           </div>
 
@@ -604,8 +582,8 @@ export default function AdminCash() {
               <p className="small muted">Abierta el {formatDateTime(session.opened_at)}</p>
               <div className="divider" />
               <div className="flex justify-between gap-2">
-                <span className="muted small">Tasa del turno</span>
-                <strong>{number(session.exchange_rate)} Bs/USD</strong>
+                <span className="muted small">Tasa EUR del día</span>
+                <strong>{formatRate(session.exchange_rate)} Bs/€</strong>
               </div>
               <div className="flex justify-between gap-2 mt-1">
                 <span className="muted small">Efectivo USD esperado</span>
@@ -872,7 +850,7 @@ export default function AdminCash() {
                 </select>
               </div>
               <div className="field">
-                <label>{capitalForm.currency === 'BS' ? 'Tasa Bs/USD' : 'Referencia'}</label>
+                <label>{capitalForm.currency === 'BS' ? 'Tasa EUR (Bs/€)' : 'Referencia'}</label>
                 <input
                   className="input"
                   type="number"
@@ -995,24 +973,15 @@ export default function AdminCash() {
             />
           </div>
           <div className="field">
-            <label>Tasa del turno (Bs/USD)</label>
-            <div className={styles.rateField}>
-              <ArrowDownUp size={15} />
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={exchangeRate}
-                onChange={(e) => setExchangeRate(e.target.value)}
-                placeholder="Tasa BCV EUR"
-              />
-              <button type="button" className="btn btn-sm" onClick={useCurrentRate}>
-                Usar tasa del día
-              </button>
+            <label>Tasa EUR del día</label>
+            <div className={styles.rateReadonly}>
+              {exchangeRate ? `${formatRate(exchangeRate)} Bs/€` : 'Sin tasa disponible'}
             </div>
           </div>
         </div>
+        <p className="tiny muted mt-1">
+          La tasa se toma automáticamente de la BCV EUR del día.
+        </p>
         <div className="flex justify-between items-center gap-2 mt-2 wrap">
           <strong className="small">Total apertura: {money(openingTotal)}</strong>
           <button type="button" className="btn btn-sm" onClick={bringLastClose}>

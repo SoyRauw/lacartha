@@ -123,7 +123,7 @@ export default function VueltoMixto({
             disabled={disabled || effectiveRate <= 0}
           />
           {bsAmount > 0 ? (
-            <p className={styles.hint}>{formatBs(bsAmount)} a la tasa del turno</p>
+            <p className={styles.hint}>{formatBs(bsAmount)} a la tasa EUR del día</p>
           ) : null}
           {remaining > 0 && effectiveRate > 0 ? (
             <button

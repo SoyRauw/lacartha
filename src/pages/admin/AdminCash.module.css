@@ -80,6 +80,18 @@
   min-width: 130px;
 }
 
+.rateReadonly {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .diffBox {
   padding: 9px 11px;
   border-radius: 9px;

@@ -395,7 +395,7 @@ export default function AdminSales() {
               <div>
                 <p className="label">Tasa</p>
                 <p className="small">
-                  {detail.rate_value ? `${number(detail.rate_value)} Bs/USD` : '—'}
+                  {detail.rate_value ? `${number(detail.rate_value)} Bs/€` : '—'}
                 </p>
               </div>
             </div>
