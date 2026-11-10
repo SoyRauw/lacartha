@@ -1,0 +1,270 @@
+.ticketButton {
+  position: relative;
+  flex: 0 0 214px;
+  width: 214px;
+  border: 0;
+  background: transparent;
+  padding: 18px 0 0;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  transform-origin: top center;
+  filter: drop-shadow(0 12px 18px rgba(74, 28, 0, 0.16));
+}
+
+.clip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  width: 34px;
+  height: 18px;
+  transform: translateX(-50%);
+  border-radius: 4px 4px 7px 7px;
+  background: linear-gradient(180deg, #e6e1d8 0%, #b9b1a6 45%, #8d857a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 3px 5px rgba(0, 0, 0, 0.18);
+}
+
+.clip::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: -7px;
+  height: 9px;
+  border: 2px solid #9c9488;
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+}
+
+.ticket {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 246px;
+  padding: 16px 14px 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 32%),
+    #fffdf8;
+  border: 1px solid #e8ddcc;
+  border-radius: 2px 2px 4px 4px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    inset 0 -18px 26px rgba(232, 221, 204, 0.26);
+  overflow: hidden;
+}
+
+.ticket::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(74, 28, 0, 0.025) 0,
+    rgba(74, 28, 0, 0.025) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+.ticket::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 10px;
+  background: radial-gradient(circle at 6px 0, transparent 5.5px, #fffdf8 6px) 0 0 / 12px 10px repeat-x;
+}
+
+.overdue {
+  border-color: #f3b26a;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 183, 3, 0.35),
+    inset 0 -18px 26px rgba(255, 183, 3, 0.1);
+}
+
+.topRow {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.number {
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--brown);
+}
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-5deg);
+  opacity: 0.92;
+}
+
+.statusNuevo {
+  color: var(--red);
+}
+
+.statusPreparando {
+  color: #b26a00;
+}
+
+.statusListo {
+  color: var(--green);
+}
+
+.statusEntregado {
+  color: var(--muted);
+}
+
+.statusCancelado {
+  color: var(--red);
+  opacity: 0.55;
+}
+
+.customer {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--brown);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.address {
+  position: relative;
+  z-index: 1;
+  display: -webkit-box;
+  align-items: flex-start;
+  gap: 3px;
+  margin-top: 5px;
+  font-size: 9.5px;
+  line-height: 1.3;
+  color: var(--muted);
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.divider {
+  position: relative;
+  z-index: 1;
+  height: 1px;
+  margin: 11px 0 9px;
+  background-image: linear-gradient(90deg, #cbbba6 45%, transparent 45%);
+  background-size: 8px 1px;
+}
+
+.itemsLine {
+  position: relative;
+  z-index: 1;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.total {
+  position: relative;
+  z-index: 1;
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.bsTotal {
+  position: relative;
+  z-index: 1;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.elapsed {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+.elapsedOverdue {
+  color: var(--orange);
+}
+
+.paid {
+  position: absolute;
+  right: 12px;
+  bottom: 18px;
+  z-index: 1;
+  padding: 2px 5px;
+  border: 1px solid var(--green);
+  border-radius: 3px;
+  color: var(--green);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(3deg);
+}
+
+@media (max-width: 640px) {
+  .ticketButton {
+    flex-basis: 186px;
+    width: 186px;
+  }
+
+  .ticket {
+    min-height: 226px;
+    padding: 14px 12px 20px;
+  }
+
+  .customer {
+    font-size: 1.2rem;
+  }
+}

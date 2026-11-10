@@ -1,0 +1,107 @@
+.drawerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
+  gap: 6px;
+}
+
+.drawerTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 5px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--white);
+}
+
+.drawerTileNegative {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.drawerDenom {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--brown);
+}
+
+.drawerQty {
+  font-size: 11px;
+}
+
+.drawerSubtotal {
+  font-size: 8.5px;
+  color: var(--muted);
+}
+
+.drawerTotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--line);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.drawerTotal strong {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--text);
+}
+
+.methodCard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.methodCard strong {
+  font-size: 13px;
+}
+
+.rateField {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.rateField .input {
+  flex: 1;
+  min-width: 130px;
+}
+
+.diffBox {
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.diffOk {
+  background: var(--green-soft);
+  border-color: rgba(45, 106, 79, 0.24);
+  color: var(--green);
+}
+
+.diffUp {
+  background: #fff9e6;
+  border-color: rgba(212, 160, 23, 0.28);
+  color: #9a6b00;
+}
+
+.diffDown {
+  background: var(--red-soft);
+  border-color: rgba(193, 18, 31, 0.22);
+  color: var(--red);
+}

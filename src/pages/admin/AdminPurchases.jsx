@@ -16,6 +16,7 @@ import {
   StatCard,
   useToast,
 } from '../../components/ui'
+import BillPicker from '../../components/BillPicker'
 import { useCatalog } from '../../hooks/useCatalog'
 import { supabase } from '../../lib/supabase'
 import { refreshCatalog } from '../../lib/catalog'
@@ -30,7 +31,9 @@ import {
 } from '../../lib/currency'
 import { formatDate, formatDateTime, todayISO } from '../../lib/dates'
 import { getRateValue } from '../../lib/rates'
-import { addLocalCashMovement, getOpenLocalSession } from '../../lib/localCash'
+import { addLocalBillMovements, addLocalCashMovement, getLocalBillLedger, getOpenLocalSession } from '../../lib/localCash'
+import { drawerFromLedger, emptyBillCounts, sumBills } from '../../lib/bills'
+import { syncCashBillMovements } from '../../lib/sync'
 
 function newRow() {
   return {
@@ -50,6 +53,7 @@ export default function AdminPurchases() {
   const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [cashBills, setCashBills] = useState(emptyBillCounts())
   const [detail, setDetail] = useState(null)
   const [form, setForm] = useState({
     purchase_date: todayISO(),
@@ -111,6 +115,14 @@ export default function AdminPurchases() {
     [catalog.payment_methods],
   )
 
+  const selectedMethod = useMemo(
+    () => paymentMethods.find((m) => m.id === form.payment_method_id) || null,
+    [paymentMethods, form.payment_method_id],
+  )
+  const cashBillsTotal = useMemo(() => sumBills(cashBills), [cashBills])
+  const needsBills =
+    selectedMethod?.affects_cash === true && selectedMethod?.currency === 'USD'
+
   const formTotal = useMemo(
     () =>
       form.items.reduce((sum, item) => sum + (parseNumber(item.total_usd) || 0), 0),
@@ -143,6 +155,7 @@ export default function AdminPurchases() {
       notes: '',
       items: [newRow()],
     })
+    setCashBills(emptyBillCounts())
     setModalOpen(true)
   }
 
@@ -179,6 +192,32 @@ export default function AdminPurchases() {
       push('El total no puede ser negativo', 'error')
       return
     }
+    if (needsBills && Math.abs(cashBillsTotal - formTotal) > 0.02) {
+      push(
+        'Los billetes suman ' +
+          money(cashBillsTotal) +
+          ' y la compra es ' +
+          money(formTotal) +
+          '. Ajusta los billetes o cambia el método.',
+        'error',
+      )
+      return
+    }
+
+    let cashSession = null
+    if (needsBills) {
+      cashSession = await getOpenLocalSession()
+      if (cashSession) {
+        const ledger = await getLocalBillLedger(cashSession.id)
+        const drawer = drawerFromLedger(ledger)
+        for (const [denom, qty] of Object.entries(cashBills)) {
+          if (Number(qty) > (drawer[denom] || 0)) {
+            push(`No hay suficientes billetes de $${denom} en el cajón`, 'error')
+            return
+          }
+        }
+      }
+    }
     setSaving(true)
     try {
       const payload = {
@@ -202,7 +241,7 @@ export default function AdminPurchases() {
 
       const method = paymentMethods.find((m) => m.id === form.payment_method_id)
       if (method?.affects_cash && formTotal > 0) {
-        const session = await getOpenLocalSession()
+        const session = cashSession || (await getOpenLocalSession())
         if (session) {
           const cashAmount = method.currency === 'BS' ? totalBs : formTotal
           await addLocalCashMovement({
@@ -221,12 +260,23 @@ export default function AdminPurchases() {
             },
             notes: `Compra ${form.supplier_name || ''}`.trim(),
           })
+          if (method.currency === 'USD' && cashBillsTotal > 0) {
+            await addLocalBillMovements({
+              sessionId: session.id,
+              type: 'gasto',
+              counts: cashBills,
+              note: `Compra ${form.supplier_name || ''}`.trim(),
+              syncStatus: 'pending',
+            })
+            if (navigator.onLine) await syncCashBillMovements(session.id)
+          }
         }
       }
 
       await refreshCatalog().catch(() => {})
       await load()
       setModalOpen(false)
+      setCashBills(emptyBillCounts())
       push('Compra registrada y stock actualizado', 'success')
       if (data?.purchase_id) {
         // La compra ya quedó cargada; no hace falta abrir el detalle.
@@ -401,6 +451,19 @@ export default function AdminPurchases() {
           </div>
         </div>
 
+        {needsBills ? (
+          <div className="mt-2">
+            <BillPicker
+              value={cashBills}
+              onChange={setCashBills}
+              label="Billetes entregados"
+            />
+            <p className="tiny muted mt-1">
+              Los billetes deben sumar {money(formTotal)}.
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex items-center justify-between mb-2 mt-3">
           <p className="card-title" style={{ margin: 0 }}>
             <Wheat size={16} /> Ingredientes comprados
@@ -502,8 +565,8 @@ export default function AdminPurchases() {
         </div>
 
         <p className="tiny muted mt-2">
-          Al guardar se suma el stock y se recalcula el costo promedio en USD. El costo por
-          unidad base se actualiza para las recetas.
+          Al guardar se suma el stock y se recalcula el costo promedio en USD. Si pagas en
+          efectivo USD, detalla los billetes para que el cajón cuadre.
         </p>
       </Modal>
 

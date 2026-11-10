@@ -26,6 +26,7 @@ import { db } from '../../lib/db'
 import { bs as formatBs, money, number } from '../../lib/currency'
 import { formatDateTime, presetRange, rangeToTimestamps } from '../../lib/dates'
 import { downloadReceipt } from '../../lib/receipts'
+import { reverseLocalSale } from '../../lib/localCash'
 
 const PRESETS = [
   { id: 'today', label: 'Hoy' },
@@ -193,6 +194,7 @@ export default function AdminSales() {
         p_reason: voidReason.trim() || null,
       })
       if (rpcError) throw rpcError
+      await reverseLocalSale(voidSale.client_id)
       push('Venta anulada y stock restaurado', 'success')
       setVoidSale(null)
       setVoidReason('')

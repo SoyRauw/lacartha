@@ -1,0 +1,130 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdf8;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kicker {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.due {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--brown);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.methods {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.method {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.methodHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.methodTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.methodHead strong {
+  font-size: 11px;
+  color: var(--brown-2);
+}
+
+.hint {
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.coverBtn {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--orange);
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 0;
+  text-decoration: underline;
+}
+
+.coverBtn:hover {
+  color: var(--brown);
+}
+
+.summary {
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.summaryRow strong {
+  color: var(--text);
+}
+
+.warning {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--red);
+}
+
+.ok {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green);
+}

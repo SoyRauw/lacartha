@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -30,14 +30,17 @@ import {
   Loading,
   PageHeader,
   StatCard,
-  useToast,
 } from '../../components/ui'
 import { useCatalog } from '../../hooks/useCatalog'
 import { useOnline } from '../../hooks/useOnline'
 import { supabase } from '../../lib/supabase'
 import { db } from '../../lib/db'
-import { getLocalCashMovements, getOpenLocalSession } from '../../lib/localCash'
-import { bs as formatBs, money, number } from '../../lib/currency'
+import {
+  expectedCashFromMovements,
+  getLocalCashMovements,
+  getOpenLocalSession,
+} from '../../lib/localCash'
+import { money, number } from '../../lib/currency'
 import {
   dayKey,
   formatDate,
@@ -57,7 +60,6 @@ function saleCogs(items = []) {
 }
 
 export default function AdminDashboard() {
-  const { push } = useToast()
   const online = useOnline()
   const catalog = useCatalog()
   const [data, setData] = useState({
@@ -159,16 +161,9 @@ export default function AdminDashboard() {
       let cashExpectedBs = 0
       if (session) {
         const movements = await getLocalCashMovements(session.id)
-        cashExpectedUsd =
-          (Number(session.opening_usd) || 0) +
-          movements
-            .filter((m) => m.affects_cash && m.currency === 'USD')
-            .reduce((sum, m) => sum + (Number(m.amount) || 0), 0)
-        cashExpectedBs =
-          (Number(session.opening_bs) || 0) +
-          movements
-            .filter((m) => m.affects_cash && m.currency === 'BS')
-            .reduce((sum, m) => sum + (Number(m.amount) || 0), 0)
+        const expected = expectedCashFromMovements(session, movements)
+        cashExpectedUsd = expected.expectedUsd
+        cashExpectedBs = expected.expectedBs
       }
 
       const capitalNet = (capitalRes.data || []).reduce(

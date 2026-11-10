@@ -16,6 +16,7 @@ import {
   StatCard,
   useToast,
 } from '../../components/ui'
+import BillPicker from '../../components/BillPicker'
 import { useCatalog } from '../../hooks/useCatalog'
 import { supabase } from '../../lib/supabase'
 import { EXPENSE_CATEGORIES, RATE_SOURCES } from '../../lib/constants'
@@ -28,7 +29,9 @@ import {
 } from '../../lib/currency'
 import { formatDate, todayISO } from '../../lib/dates'
 import { getRateValue } from '../../lib/rates'
-import { addLocalCashMovement, getOpenLocalSession } from '../../lib/localCash'
+import { addLocalBillMovements, addLocalCashMovement, getLocalBillLedger, getOpenLocalSession } from '../../lib/localCash'
+import { drawerFromLedger, emptyBillCounts, sumBills } from '../../lib/bills'
+import { syncCashBillMovements } from '../../lib/sync'
 
 const EMPTY_FORM = {
   id: null,
@@ -54,6 +57,7 @@ export default function AdminExpenses() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [cashBills, setCashBills] = useState(emptyBillCounts())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -91,6 +95,17 @@ export default function AdminExpenses() {
     [catalog.payment_methods],
   )
 
+  const selectedMethod = useMemo(
+    () => paymentMethods.find((m) => m.id === form.payment_method_id) || null,
+    [paymentMethods, form.payment_method_id],
+  )
+  const cashBillsTotal = useMemo(() => sumBills(cashBills), [cashBills])
+  const needsBills =
+    !form.id &&
+    selectedMethod?.affects_cash === true &&
+    selectedMethod?.currency === 'USD' &&
+    form.currency === 'USD'
+
   const stats = useMemo(() => {
     const now = new Date()
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -125,10 +140,12 @@ export default function AdminExpenses() {
       rate_value: rate ? String(rate) : '',
       payment_method_id: paymentMethods[0]?.id || '',
     })
+    setCashBills(emptyBillCounts())
     setModalOpen(true)
   }
 
   const openEdit = (expense) => {
+    setCashBills(emptyBillCounts())
     setForm({
       id: expense.id,
       expense_date: expense.expense_date || todayISO(),
@@ -163,6 +180,32 @@ export default function AdminExpenses() {
     if (!form.description.trim() && form.category === 'Otros') {
       // Permitimos gastos sin descripción, pero el monto debe existir.
     }
+    if (needsBills && Math.abs(cashBillsTotal - amountUsd) > 0.02) {
+      push(
+        'Los billetes suman ' +
+          money(cashBillsTotal) +
+          ' y el gasto es ' +
+          money(amountUsd) +
+          '. Ajusta los billetes o cambia el método.',
+        'error',
+      )
+      return
+    }
+
+    let cashSession = null
+    if (needsBills) {
+      cashSession = await getOpenLocalSession()
+      if (cashSession) {
+        const ledger = await getLocalBillLedger(cashSession.id)
+        const drawer = drawerFromLedger(ledger)
+        for (const [denom, qty] of Object.entries(cashBills)) {
+          if (Number(qty) > (drawer[denom] || 0)) {
+            push(`No hay suficientes billetes de $${denom} en el cajón`, 'error')
+            return
+          }
+        }
+      }
+    }
     setSaving(true)
     try {
       const payload = {
@@ -189,7 +232,7 @@ export default function AdminExpenses() {
         // Si el gasto se paga en efectivo y hay una caja abierta, impacta el arqueo local.
         const method = paymentMethods.find((m) => m.id === form.payment_method_id)
         if (method?.affects_cash && form.currency !== 'USDT') {
-          const session = await getOpenLocalSession()
+          const session = cashSession || (await getOpenLocalSession())
           if (session) {
             await addLocalCashMovement({
               sessionId: session.id,
@@ -207,6 +250,16 @@ export default function AdminExpenses() {
               },
               notes: `Gasto: ${form.description || form.category}`,
             })
+            if (method.currency === 'USD' && form.currency === 'USD' && cashBillsTotal > 0) {
+              await addLocalBillMovements({
+                sessionId: session.id,
+                type: 'gasto',
+                counts: cashBills,
+                note: `Gasto: ${form.description || form.category}`,
+                syncStatus: 'pending',
+              })
+              if (navigator.onLine) await syncCashBillMovements(session.id)
+            }
             push('Gasto registrado y descontado de la caja', 'success')
           } else {
             push('Gasto registrado; no hay caja abierta para descontarlo', 'success')
@@ -218,6 +271,7 @@ export default function AdminExpenses() {
 
       await load()
       setModalOpen(false)
+      setCashBills(emptyBillCounts())
     } catch (e) {
       console.error(e)
       push(e.message || 'No se pudo guardar el gasto', 'error')
@@ -421,6 +475,19 @@ export default function AdminExpenses() {
           </div>
         </div>
 
+        {needsBills ? (
+          <div className="mt-2">
+            <BillPicker
+              value={cashBills}
+              onChange={setCashBills}
+              label="Billetes entregados"
+            />
+            <p className="tiny muted mt-1">
+              Los billetes deben sumar {money(amountUsd)}.
+            </p>
+          </div>
+        ) : null}
+
         {form.currency === 'BS' ? (
           <div className="form-grid mt-2">
             <div className="field">
@@ -456,7 +523,7 @@ export default function AdminExpenses() {
         </div>
 
         <p className="tiny muted mt-2">
-          Si el gasto se paga en efectivo y hay una caja abierta, se descuenta del arqueo local.
+          Si el gasto se paga en efectivo USD, detalla los billetes para que el cajón cuadre.
         </p>
       </Modal>
     </>

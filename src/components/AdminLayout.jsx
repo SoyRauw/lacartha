@@ -4,6 +4,7 @@ import {
   BarChart3,
   Boxes,
   ChevronRight,
+  ClipboardList,
   Cloud,
   CloudOff,
   FlaskConical,
@@ -27,6 +28,7 @@ import Logo from './Logo'
 import { useAuth } from '../hooks/useAuth'
 import { useCatalog } from '../hooks/useCatalog'
 import { useOnline, usePendingCount } from '../hooks/useOnline'
+import { useNewOrdersCount } from '../hooks/usePublicOrders'
 import { useToast } from './ui'
 import { syncAll } from '../lib/sync'
 import { ensureDailyRates } from '../lib/rates'
@@ -36,6 +38,7 @@ const NAV = [
     section: 'Principal',
     items: [
       { to: '/admin/hoy', label: 'Hoy', icon: LayoutDashboard },
+      { to: '/admin/comandas', label: 'Comandas', icon: ClipboardList },
       { to: '/admin/vender', label: 'Vender', icon: ShoppingCart },
       { to: '/admin/ventas', label: 'Ventas', icon: ReceiptText },
     ],
@@ -75,6 +78,7 @@ const NAV = [
 
 const TITLES = {
   '/admin/hoy': 'Hoy',
+  '/admin/comandas': 'Comandas',
   '/admin/vender': 'Vender',
   '/admin/ventas': 'Ventas',
   '/admin/menu': 'Productos',
@@ -97,6 +101,7 @@ export default function AdminLayout() {
   const { lastSync } = useCatalog()
   const online = useOnline()
   const pending = usePendingCount()
+  const newOrders = useNewOrdersCount()
   const { push } = useToast()
   const location = useLocation()
   const navigate = useNavigate()
@@ -184,6 +189,9 @@ export default function AdminLayout() {
                     <span>{item.label}</span>
                     {item.to === '/admin/ventas' && pending.sales > 0 ? (
                       <span className="nav-badge">{pending.sales}</span>
+                    ) : null}
+                    {item.to === '/admin/comandas' && newOrders.count > 0 ? (
+                      <span className="nav-badge">{newOrders.count}</span>
                     ) : null}
                   </NavLink>
                 )

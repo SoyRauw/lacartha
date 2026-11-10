@@ -19,6 +19,14 @@ db.version(1).stores({
   cash_movements: 'id, cash_session_id, created_at',
 })
 
+db.version(2).stores({
+  cash_bill_movements: 'id, cash_session_id, sale_id, type, created_at',
+})
+
+db.version(3).stores({
+  cash_bill_movements: 'id, cash_session_id, sale_id, type, sync_status, created_at',
+})
+
 export async function getSetting(key, fallback = null) {
   const row = await db.settings.get(key)
   return row ? row.value : fallback

@@ -1,0 +1,143 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+  gap: 7px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tileActive {
+  border-color: var(--orange);
+  background: #fff9ed;
+}
+
+.denom {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--brown);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stepBtn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.stepBtn:hover:not(:disabled) {
+  background: var(--cream);
+  border-color: var(--orange-2);
+}
+
+.stepBtn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.qty {
+  min-width: 18px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.subtotal {
+  font-size: 9px;
+  color: var(--muted);
+  min-height: 12px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.total {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.total strong {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--text);
+}
+
+.clearBtn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: underline;
+  padding: 2px;
+}
+
+.clearBtn:hover {
+  color: var(--orange);
+}
+
+.compact .grid {
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 5px;
+}
+
+.compact .tile {
+  padding: 6px 4px 5px;
+  border-radius: 8px;
+}
+
+.compact .denom {
+  font-size: 0.92rem;
+}
+
+.compact .subtotal {
+  font-size: 8px;
+}
+
+.compact .total strong {
+  font-size: 1.05rem;
+}

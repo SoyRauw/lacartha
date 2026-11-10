@@ -32,11 +32,10 @@ import {
   bs as formatBs,
   convertUsdToBs,
   money,
-  number,
   parseNumber,
   roundBs,
 } from '../../lib/currency'
-import { formatDate, generateOrderNumber } from '../../lib/dates'
+import { formatDate } from '../../lib/dates'
 import { fetchRatesFromApi, rateLabel } from '../../lib/rates'
 import { buildOrderMessage, openWhatsApp } from '../../lib/whatsapp'
 import styles from './PublicMenu.module.css'
@@ -292,7 +291,7 @@ export default function PublicMenu() {
     setCheckoutOpen(true)
   }
 
-  const sendOrder = () => {
+  const sendOrder = async () => {
     if (!cart.length) return
     if (!customer.name.trim() || !customer.phone.trim()) {
       alert('Escribe tu nombre y teléfono para enviar el pedido.')
@@ -304,9 +303,29 @@ export default function PublicMenu() {
     }
     setSending(true)
     try {
-      const orderNumber = generateOrderNumber()
+      const payload = {
+        customer_name: customer.name.trim(),
+        customer_phone: customer.phone.trim(),
+        fulfillment: customer.fulfillment,
+        address: customer.address.trim(),
+        notes: customer.notes.trim(),
+        rate_source: source,
+        rate_value: rateValue,
+        items: cart.map((item) => ({
+          product_id: item.product.id,
+          quantity: Number(item.quantity),
+          notes: item.notes || '',
+          option_ids: item.selectedOptions.map((option) => option.id),
+        })),
+      }
+
+      const { data, error: rpcError } = await supabase.rpc('create_public_order', { payload })
+      if (rpcError) throw rpcError
+      const result = typeof data === 'string' ? JSON.parse(data) : data
+      if (!result?.order_number) throw new Error('No se recibió el número de pedido')
+
       const message = buildOrderMessage({
-        orderNumber,
+        orderNumber: result.order_number,
         customer,
         items: cart.map((item) => ({
           product_name: item.product.name,
@@ -314,20 +333,27 @@ export default function PublicMenu() {
           options: item.selectedOptions.map((o) => ({ option_name: o.name })),
           line_total_usd: Number(item.unitPriceUsd) * Number(item.quantity),
         })),
-        totalUsd: cartTotalUsd,
-        totalBs: cartTotalBs,
-        rateSource: source,
-        rateValue,
+        totalUsd: Number(result.total_usd ?? cartTotalUsd),
+        totalBs: Number(result.total_bs ?? cartTotalBs),
+        rateSource: result.rate_source || source,
+        rateValue: Number(result.rate_value ?? rateValue),
         notes: customer.notes,
       })
-      openWhatsApp(message, business?.whatsapp_phone || BUSINESS_WHATSAPP)
-      setSentOrder({ orderNumber, message, totalUsd: cartTotalUsd, totalBs: cartTotalBs })
+
+      setSentOrder({
+        orderNumber: result.order_number,
+        message,
+        totalUsd: Number(result.total_usd ?? cartTotalUsd),
+        totalBs: Number(result.total_bs ?? cartTotalBs),
+        registered: true,
+      })
       setCheckoutOpen(false)
       setCart([])
       setCartOpen(false)
     } catch (e) {
       console.error(e)
-      alert('No se pudo abrir WhatsApp. Intenta de nuevo.')
+      const message = e.message || 'No se pudo registrar el pedido'
+      alert(`${message}. Intenta de nuevo o escríbenos por WhatsApp.`)
     } finally {
       setSending(false)
     }
@@ -485,7 +511,7 @@ export default function PublicMenu() {
           <div className={styles.step}>
             <span className={styles.stepNum}>2</span>
             <p className={styles.stepTitle}>Envía el pedido</p>
-            <p className={styles.stepText}>Se abre WhatsApp con el resumen listo.</p>
+            <p className={styles.stepText}>Queda registrado en el tablero de La Cartha.</p>
           </div>
           <div className={styles.step}>
             <span className={styles.stepNum}>3</span>
@@ -691,10 +717,10 @@ export default function PublicMenu() {
                 onClick={openCheckout}
                 disabled={!cart.length}
               >
-                <MessageCircle size={16} /> Pedir por WhatsApp
+                <ShoppingBag size={16} /> Hacer pedido
               </button>
               <p className="tiny muted mt-2" style={{ textAlign: 'center' }}>
-                Te compartimos los datos de pago por WhatsApp.
+                Tu pedido llega al tablero de La Cartha. Los datos de pago se comparten por WhatsApp.
               </p>
             </div>
           </aside>
@@ -850,7 +876,7 @@ export default function PublicMenu() {
               disabled={sending}
             >
               {sending ? <Loader2 size={15} className="spin" /> : <MessageCircle size={15} />}
-              Enviar por WhatsApp
+              Enviar pedido
             </button>
           </>
         }
@@ -945,7 +971,7 @@ export default function PublicMenu() {
       <Modal
         open={Boolean(sentOrder)}
         onClose={closeSent}
-        title="Pedido listo"
+        title="Pedido registrado"
         icon={CheckCircle2}
         footer={
           <>
@@ -982,7 +1008,7 @@ export default function PublicMenu() {
               <p className="muted">{formatBs(sentOrder.totalBs)}</p>
             ) : null}
             <p className="small muted mt-3">
-              Se abrió WhatsApp con el resumen. Envía el mensaje para que La Cartha lo reciba.
+              Tu pedido quedó registrado en el tablero de La Cartha. Si quieres, envía el resumen por WhatsApp para coordinar el pago.
               Si no se abrió, usa el botón “Abrir WhatsApp”.
             </p>
             <p className="tiny muted mt-2">

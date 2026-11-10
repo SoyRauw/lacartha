@@ -17,7 +17,8 @@ Sistema administrativo para **La Cartha by Valentina Castro** (banderillas corea
 ## Qué incluye
 
 - **Hoy**: ventas, costo, ganancia, gastos, efectivo y alertas.
-- **Vender**: POS táctil con banderillas configurables (1 topping + salsas ilimitadas), pagos mixtos y modo offline.
+- **Comandas**: tablero en tiempo real con las facturas colgando; pedidos del menú público, estados, sonido y cobro directo desde el POS.
+- **Vender**: POS táctil con banderillas configurables (1 topping + salsas ilimitadas), pagos mixtos, billetes USD, vuelto y modo offline.
 - **La banderilla**: constructor visual de la receta con flechas a masa, salchicha, queso, topping, salsas, palillo y empaque.
 - **Materia prima**: ingredientes, unidades, costos, stock y mínimos.
 - **Preparaciones**: masa y salsas caseras con rendimiento.
@@ -25,9 +26,9 @@ Sistema administrativo para **La Cartha by Valentina Castro** (banderillas corea
 - **Compras**: actualiza stock y costo promedio en USD.
 - **Inventario**: stock teórico diario y conteo semanal con merma.
 - **Gastos**: categorías, moneda y medio de pago.
-- **Caja**: apertura, cierre, arqueo y diferencia.
+- **Caja**: apertura y cierre por billetes, cajón en vivo, Bs, vuelto mixto y diferencia.
 - **Reportes**: ventas, márgenes, top productos, medios de pago y punto de equilibrio.
-- **Menú público** (`/menu`): carrito, precios USD/Bs y pedido por WhatsApp.
+- **Menú público** (`/menu`): carrito, precios USD/Bs, nombre y teléfono del cliente, y pedido que llega al tablero de comandas.
 - **Recibos PDF** descargables.
 
 ## Tasa BCV automática
@@ -75,10 +76,14 @@ Ejecuta las migraciones en el **SQL Editor** de Supabase, en este orden:
 6. `supabase/migrations/006_functions.sql`
 7. `supabase/migrations/007_seed.sql`
 8. `supabase/migrations/008_storage.sql`
+9. `supabase/migrations/009_public_orders.sql`
+10. `supabase/migrations/010_cash_bills.sql`
+11. `supabase/migrations/011_functions_orders_cash.sql`
+12. `supabase/migrations/012_fix_public_order_options.sql`
 
-Atajo manual: `supabase/000_all_manual.sql` contiene las 8 migraciones en orden; puedes pegarlo de una sola vez en el SQL Editor. Está fuera de `supabase/migrations` para que el CLI no lo ejecute por duplicado.
+Atajo manual: `supabase/000_all_manual.sql` contiene las 12 migraciones en orden; puedes pegarlo de una sola vez en el SQL Editor. Está fuera de `supabase/migrations` para que el CLI no lo ejecute por duplicado.
 
-Las migraciones fueron probadas contra PostgreSQL 15, incluyendo venta, compra, anulación, conteo y cierre de caja.
+Las migraciones fueron probadas contra PostgreSQL 15, incluyendo venta, compra, anulación, conteo, cierre de caja, comandas públicas, billetes y vuelto.
 
 ### Migraciones con el CLI
 
@@ -105,22 +110,46 @@ La app no tiene registro público: solo entran usuarios creados en Supabase Auth
 2. **Materia prima**: carga el precio de compra y el stock de cada ingrediente.
 3. **La banderilla**: ajusta masa, queso, salchicha, toppings y salsas.
 4. **Compras**: registra una compra inicial si ya tienes inventario.
-5. **Caja**: abre la caja con el efectivo inicial.
+5. **Caja**: abre la caja contando los billetes y define la tasa del turno.
 6. **Ajustes → Menú público**: activa el menú y descarga el QR.
+7. **Comandas**: deja el tablero abierto en la cocina o en el teléfono para recibir los pedidos.
 
 ## POS offline
 
 - El catálogo se descarga a IndexedDB cuando hay internet.
 - Las ventas y la caja funcionan sin conexión.
-- Al volver la señal, se sincronizan con Supabase.
+- Los billetes recibidos, el vuelto y la tasa del turno se guardan localmente.
+- Al volver la señal, se sincronizan ventas, billetes y cierres con Supabase.
 - En iPhone la sincronización es al abrir la app (iOS no tiene background sync).
 - Si el teléfono se pierde antes de sincronizar, se pierden las ventas pendientes. Sincroniza con frecuencia.
+
+## Comandas
+
+- Ruta: `/admin/comandas`.
+- El cliente pide desde `/menu` y deja **nombre y teléfono**.
+- El pedido se guarda en Supabase y aparece en el tablero en tiempo real.
+- Estados: **nuevo → preparando → listo → entregado**, con cancelación.
+- El tablero tiene sonido, badge y notificaciones del navegador.
+- Cada factura se abre con el detalle completo: productos, topping, salsas, notas, dirección, teléfono y total.
+- **Cobrar comanda** abre el POS con el carrito cargado; al cobrar, la venta queda vinculada y la comanda pasa a entregada.
+- El botón de WhatsApp sigue disponible para coordinar el pago manualmente.
+
+## Caja por billetes
+
+- Denominaciones: **$100, $50, $20, $10, $5, $2 y $1**.
+- La apertura se hace contando billetes; el total USD se calcula solo.
+- Cada venta en efectivo USD registra los billetes recibidos y los billetes entregados como vuelto.
+- El vuelto se puede dar en **billetes USD, Bs o pago móvil**, y el vendedor decide cuál usar.
+- El cierre compara el cajón contado contra el esperado por denominación y muestra diferencias en USD y Bs.
+- Los gastos, compras y retiros en efectivo USD también piden los billetes para que el cajón cuadre.
+- El botón **Movimiento de efectivo** permite retirar, gastar o agregar billetes al cajón.
 
 ## Menú público
 
 - URL: `/menu`.
 - No muestra costos, stock ni datos de pago.
-- El cliente arma el pedido y se abre WhatsApp con el resumen.
+- El cliente arma el pedido, escribe nombre, teléfono y tipo de entrega.
+- El pedido se registra en el tablero de comandas antes de abrir WhatsApp.
 - Valentina comparte los datos de pago manualmente por WhatsApp.
 - El QR se genera desde **Ajustes**.
 
@@ -168,6 +197,9 @@ npm test
 ## Notas
 
 - La moneda de cuenta es **USD**. Los precios se guardan en USD y el Bs se recalcula con la tasa elegida.
+- La tasa del turno se fija al abrir la caja y se usa para el vuelto en Bs.
+- Los billetes USD se controlan por denominación; los Bs se controlan por monto total.
+- El pago móvil como vuelto queda registrado en la venta, pero no afecta el cajón físico.
 - Las compras actualizan el costo promedio ponderado en USD.
 - El costo de venta se congela al momento de vender.
 - El conteo semanal ajusta el stock real y registra la diferencia como merma.

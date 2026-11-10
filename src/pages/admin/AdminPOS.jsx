@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Calculator,
   CheckCircle2,
   CircleDollarSign,
+  ClipboardList,
   Cloud,
   CloudOff,
   CreditCard,
@@ -19,6 +20,7 @@ import {
   Trash2,
   UtensilsCrossed,
   Wallet,
+  X,
 } from 'lucide-react'
 import {
   EmptyState,
@@ -27,6 +29,18 @@ import {
   PageHeader,
   useToast,
 } from '../../components/ui'
+import BillPicker from '../../components/BillPicker'
+import VueltoMixto, {
+  emptyChange,
+  isChangeCovered,
+} from '../../components/VueltoMixto'
+import {
+  billsToJson,
+  drawerFromLedger,
+  emptyBillCounts,
+  proposeChange,
+  sumBills,
+} from '../../lib/bills'
 import { useAuth } from '../../hooks/useAuth'
 import { useCatalog } from '../../hooks/useCatalog'
 import { useOnline, usePendingCount } from '../../hooks/useOnline'
@@ -51,12 +65,15 @@ import {
 } from '../../lib/currency'
 import { generateOrderNumber } from '../../lib/dates'
 import { db } from '../../lib/db'
+import { supabase } from '../../lib/supabase'
 import {
+  addLocalBillMovements,
   addLocalCashMovement,
+  getLocalBillLedger,
   getOpenLocalSession,
   openLocalCashSession,
 } from '../../lib/localCash'
-import { getRateValue, rateLabel } from '../../lib/rates'
+import { getRateValue } from '../../lib/rates'
 import { refreshCatalog } from '../../lib/catalog'
 import { downloadReceipt } from '../../lib/receipts'
 import { syncAll, syncCashSession, syncPendingSales } from '../../lib/sync'
@@ -94,12 +111,6 @@ function optionNames(options = []) {
   return options.map((o) => o.name).filter(Boolean)
 }
 
-function paymentLabel(payment) {
-  if (payment.method?.currency === 'BS') return formatBs(payment.amount)
-  if (payment.method?.currency === 'USDT') return `${number(payment.amount)} USDT`
-  return money(payment.amount)
-}
-
 export default function AdminPOS() {
   const { user } = useAuth()
   const { push } = useToast()
@@ -127,10 +138,19 @@ export default function AdminPOS() {
   const [cashSession, setCashSession] = useState(null)
   const [cashLoading, setCashLoading] = useState(true)
   const [openCashOpen, setOpenCashOpen] = useState(false)
-  const [openingUsd, setOpeningUsd] = useState('')
   const [openingBs, setOpeningBs] = useState('')
   const [cartOpen, setCartOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [openingBills, setOpeningBills] = useState(emptyBillCounts())
+  const [sessionDrawer, setSessionDrawer] = useState(emptyBillCounts())
+  const [changeValue, setChangeValue] = useState(emptyChange())
+  const [orderData, setOrderData] = useState(null)
+  const [orderCustomer, setOrderCustomer] = useState(null)
+  const [orderId, setOrderId] = useState(null)
+  const loadedOrderRef = useRef(null)
+  const lastChangeDueRef = useRef(0)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const comandaId = searchParams.get('comanda')
 
   const ctx = useMemo(() => buildCostContext(catalog), [catalog])
 
@@ -139,6 +159,13 @@ export default function AdminPOS() {
     try {
       const session = await getOpenLocalSession()
       setCashSession(session)
+      if (session) {
+        const ledger = await getLocalBillLedger(session.id)
+        setSessionDrawer(drawerFromLedger(ledger))
+        if (session.exchange_rate) setRateValue(String(session.exchange_rate))
+      } else {
+        setSessionDrawer(emptyBillCounts())
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -160,6 +187,90 @@ export default function AdminPOS() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog.rate, catalog.business])
+
+  useEffect(() => {
+    if (!comandaId || !catalog.ready || loadedOrderRef.current === comandaId) return undefined
+    let cancelled = false
+
+    const loadOrder = async () => {
+      loadedOrderRef.current = comandaId
+      const { data, error } = await supabase
+        .from('public_orders')
+        .select('*, public_order_items(*, public_order_item_options(*))')
+        .eq('id', comandaId)
+        .maybeSingle()
+
+      if (cancelled) return
+      if (error) {
+        loadedOrderRef.current = null
+        push(error.message || 'No se pudo cargar la comanda', 'error')
+        return
+      }
+      if (!data) {
+        loadedOrderRef.current = null
+        push('Comanda no encontrada', 'error')
+        return
+      }
+      if (data.sale_id) {
+        loadedOrderRef.current = null
+        push('Esa comanda ya fue cobrada', 'info')
+        setSearchParams({})
+        return
+      }
+
+      const mapped = []
+      for (const item of data.public_order_items || []) {
+        const product = (catalog.products || []).find((p) => p.id === item.product_id)
+        if (!product) {
+          loadedOrderRef.current = null
+          push('Producto no disponible: ' + item.product_name, 'error')
+          return
+        }
+        const selectedOptions = (item.public_order_item_options || [])
+          .map((opt) => (catalog.options || []).find((o) => o.id === opt.option_id))
+          .filter(Boolean)
+        mapped.push({
+          key: 'order-' + item.id,
+          product,
+          quantity: Number(item.quantity),
+          selectedOptions,
+          notes: item.notes || '',
+          unitPrice: Number(item.unit_price_usd),
+          unitCost: saleItemUnitCost(product, selectedOptions, ctx),
+        })
+      }
+
+      setCart(mapped)
+      setOrderData(data)
+      setOrderId(data.id)
+      setOrderCustomer(data.customer_name)
+      if (Number(data.rate_value) > 0) {
+        setRateValue(String(data.rate_value))
+        setRateSource(data.rate_source || 'bcv_eur')
+      }
+      setSaleNotes(
+        'Comanda ' +
+          data.order_number +
+          ' · ' +
+          data.customer_phone +
+          ' · ' +
+          (data.fulfillment === 'delivery'
+            ? 'Delivery: ' + (data.address || '')
+            : 'Pickup'),
+      )
+      push('Comanda ' + data.order_number + ' cargada', 'success')
+    }
+
+    loadOrder().catch((e) => {
+      console.error(e)
+      loadedOrderRef.current = null
+      push(e.message || 'No se pudo cargar la comanda', 'error')
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [comandaId, catalog.ready, catalog.options, catalog.products, ctx, push, setSearchParams])
 
   const products = useMemo(
     () =>
@@ -243,13 +354,39 @@ export default function AdminPOS() {
     [payments],
   )
   const remaining = Math.max(0, total - paidUsd)
+  const changeDue = Math.max(0, paidUsd - total)
+  const rateNumber = parseNumber(rateValue) || 0
+  const cashPayments = payments.filter((p) => p.method.affects_cash)
   const referencesOk = payments.every(
     (p) => !p.method.requires_reference || p.reference.trim().length > 0,
   )
+  const changeCovered =
+    changeDue <= 0.011 || isChangeCovered(changeValue, changeDue, rateNumber)
   const canCharge =
-    total > 0 && remaining <= 0.011 && payments.length > 0 && referencesOk
+    total > 0 &&
+    payments.length > 0 &&
+    remaining <= 0.011 &&
+    referencesOk &&
+    changeCovered
+
+  useEffect(() => {
+    if (changeDue <= 0.011) {
+      if (lastChangeDueRef.current !== 0) setChangeValue(emptyChange())
+      lastChangeDueRef.current = 0
+      return
+    }
+    if (Math.abs(changeDue - lastChangeDueRef.current) > 0.009) {
+      const { proposal } = proposeChange(changeDue, sessionDrawer)
+      setChangeValue({ bills: proposal, bs: '', pm: '', pmReference: '' })
+      lastChangeDueRef.current = changeDue
+    }
+  }, [changeDue, sessionDrawer])
 
   const addToCart = (product, selectedOptions = [], quantity = 1, notes = '') => {
+    if (orderId) {
+      push('Quita la comanda para modificar el carrito', 'info')
+      return
+    }
     const qty = Number(quantity) || 1
     if (qty <= 0) return
     const unitPrice = saleItemUnitPrice(product, selectedOptions)
@@ -311,6 +448,10 @@ export default function AdminPOS() {
   }
 
   const updateQty = (key, delta) => {
+    if (orderId) {
+      push('Quita la comanda para modificar el carrito', 'info')
+      return
+    }
     setCart((prev) =>
       prev
         .map((item) =>
@@ -323,10 +464,18 @@ export default function AdminPOS() {
   }
 
   const removeItem = (key) => {
+    if (orderId) {
+      push('Quita la comanda para modificar el carrito', 'info')
+      return
+    }
     setCart((prev) => prev.filter((item) => item.key !== key))
   }
 
   const clearCart = () => {
+    if (orderId) {
+      clearOrder()
+      return
+    }
     if (!cart.length) return
     if (!window.confirm('¿Vaciar el carrito?')) return
     setCart([])
@@ -335,23 +484,36 @@ export default function AdminPOS() {
   const handleOpenCash = async () => {
     try {
       const session = await openLocalCashSession({
-        opening_usd: parseNumber(openingUsd),
+        opening_bills: openingBills,
         opening_bs: parseNumber(openingBs),
+        exchange_rate: parseNumber(rateValue) || null,
         user_id: user?.id || null,
       })
       setCashSession(session)
       setOpenCashOpen(false)
-      setOpeningUsd('')
+      setOpeningBills(emptyBillCounts())
       setOpeningBs('')
       push('Caja abierta', 'success')
       if (online) {
-        syncCashSession(session).catch((e) => console.warn('No se pudo sincronizar la caja', e))
+        syncCashSession(session)
+          .then(() => syncAll())
+          .catch((e) => console.warn('No se pudo sincronizar la caja', e))
       }
       await loadCash()
     } catch (e) {
       console.error(e)
       push(e.message || 'No se pudo abrir la caja', 'error')
     }
+  }
+
+  const clearOrder = () => {
+    setOrderData(null)
+    setOrderId(null)
+    setOrderCustomer(null)
+    setCart([])
+    setSaleNotes('')
+    loadedOrderRef.current = null
+    setSearchParams({})
   }
 
   const openPayment = () => {
@@ -363,11 +525,15 @@ export default function AdminPOS() {
     }
     const source = rateSource || 'bcv_eur'
     const value =
-      parseNumber(rateValue) || getRateValue(catalog.rate, source) || 0
+      parseNumber(rateValue) ||
+      getRateValue(catalog.rate, source) ||
+      Number(cashSession.exchange_rate) ||
+      0
     setRateSource(source)
     if (value) setRateValue(String(value))
     setPayments([])
-    setSaleNotes('')
+    setChangeValue(emptyChange())
+    if (!orderId) setSaleNotes('')
     setPaymentOpen(true)
   }
 
@@ -382,16 +548,24 @@ export default function AdminPOS() {
       push('Escribe la tasa Bs/USD para cobrar en bolívares', 'error')
       return
     }
-    const amount = method.currency === 'BS' ? convertUsdToBs(rest, rate) : rest
-    const amountUsd = method.currency === 'BS' ? convertBsToUsd(amount, rate) : rest
+
+    const isCashUsd = method.affects_cash && method.currency === 'USD'
+    const amount = isCashUsd
+      ? ''
+      : method.currency === 'BS'
+        ? convertUsdToBs(rest, rate).toFixed(2)
+        : rest.toFixed(2)
+    const amountUsd = isCashUsd ? 0 : rest
+
     setPayments((prev) => [
       ...prev,
       {
         key: crypto.randomUUID(),
         method,
-        amount: amount.toFixed(2),
+        amount,
         amountUsd: amountUsd.toFixed(2),
         reference: '',
+        bills: isCashUsd ? emptyBillCounts() : null,
       },
     ])
   }
@@ -406,6 +580,15 @@ export default function AdminPOS() {
           const amountUsd =
             p.method.currency === 'BS' ? convertBsToUsd(amountNum, rate) : amountNum
           return { ...p, amount: value, amountUsd: amountUsd.toFixed(2) }
+        }
+        if (field === 'bills') {
+          const totalBills = sumBills(value)
+          return {
+            ...p,
+            bills: value,
+            amount: totalBills ? totalBills.toFixed(2) : '',
+            amountUsd: totalBills.toFixed(2),
+          }
         }
         return { ...p, [field]: value }
       }),
@@ -441,9 +624,16 @@ export default function AdminPOS() {
       return
     }
     if (!canCharge) {
-      push('Faltan pagos por cubrir', 'error')
+      if (changeDue > 0.011 && !changeCovered) {
+        push('Completa el vuelto para poder cobrar', 'error')
+      } else if (!referencesOk) {
+        push('Completa las referencias obligatorias de los pagos', 'error')
+      } else {
+        push('Faltan pagos por cubrir', 'error')
+      }
       return
     }
+
     setSubmitting(true)
     try {
       const clientId = crypto.randomUUID()
@@ -481,17 +671,58 @@ export default function AdminPOS() {
         }
       })
 
+      if (changeDue > 0.011 && cashPayments.length === 0) {
+        throw new Error('El vuelto solo se puede dar desde un pago en efectivo')
+      }
+      if (changeDue > 0.011 && cashPayments.length > 1) {
+        throw new Error('Usa un solo pago en efectivo para poder dar el vuelto')
+      }
+
+      const changeTarget =
+        changeDue > 0.011
+          ? cashPayments[0]
+          : null
+
+      if (changeTarget && (Number(changeTarget.amountUsd) || 0) + 0.011 < changeDue) {
+        throw new Error(
+          'El pago en efectivo no alcanza para dar el vuelto. Agrega un billete más grande.',
+        )
+      }
+
+      const changeUsd = sumBills(changeValue.bills || {})
+      const changeBs = parseNumber(changeValue.bs)
+      const changePm = parseNumber(changeValue.pm)
+
+      for (const [denom, qty] of Object.entries(changeValue.bills || {})) {
+        if (Number(qty) > (sessionDrawer[denom] || 0)) {
+          throw new Error(`No hay suficientes billetes de $${denom} para el vuelto`)
+        }
+      }
+
       const paymentsPayload = payments.map((p) => {
-        const amount = parseNumber(p.amount)
-        const amountUsd =
-          p.method.currency === 'BS' ? convertBsToUsd(amount, rate) : amount
+        const grossUsd = Number(p.amountUsd) || 0
+        const isTarget = changeTarget?.key === p.key
+        const appliedUsd = isTarget ? Math.max(0, grossUsd - changeDue) : grossUsd
+        const appliedNative = p.method.currency === 'BS' ? appliedUsd * rate : appliedUsd
+        const receivedNative = p.method.affects_cash ? parseNumber(p.amount) : appliedNative
         return {
           payment_method_id: p.method.id,
           method_code: p.method.code,
           method_name: p.method.name,
           currency: p.method.currency,
-          amount,
-          amount_usd: amountUsd,
+          amount: appliedNative,
+          amount_usd: appliedUsd,
+          received_amount: receivedNative,
+          received_usd: p.method.affects_cash ? grossUsd : appliedUsd,
+          change_usd: isTarget ? changeUsd : 0,
+          change_bs: isTarget ? changeBs : 0,
+          change_pm_amount: isTarget ? changePm : 0,
+          change_pm_reference: isTarget ? changeValue.pmReference || null : null,
+          bills:
+            p.method.affects_cash && p.method.currency === 'USD'
+              ? billsToJson(p.bills || {})
+              : null,
+          change_bills: isTarget ? billsToJson(changeValue.bills || {}) : null,
           rate_source: rateSource,
           rate_value: rate,
           reference: p.reference || null,
@@ -503,15 +734,16 @@ export default function AdminPOS() {
         client_id: clientId,
         order_number: orderNumber,
         cash_session_id: cashSession.id,
+        public_order_id: orderId || null,
         subtotal_usd: total,
         discount_usd: 0,
         total_usd: total,
         total_bs: convertUsdToBs(total, rate),
-        change_usd: 0,
-        change_bs: 0,
+        change_usd: changeUsd,
+        change_bs: changeBs,
         rate_source: rateSource,
         rate_value: rate,
-        customer_name: null,
+        customer_name: orderCustomer || null,
         notes: saleNotes.trim() || null,
         created_at: now,
         items: itemsPayload,
@@ -561,14 +793,55 @@ export default function AdminPOS() {
           sessionId: cashSession.id,
           payment,
           saleId: clientId,
-          notes: `Venta ${orderNumber}`,
+          notes: 'Venta ' + orderNumber,
         })
       }
+
+      const receivedBills = {}
+      const changeBills = {}
+      for (const payment of payments) {
+        if (payment.method.affects_cash && payment.method.currency === 'USD' && payment.bills) {
+          for (const [denom, qty] of Object.entries(payment.bills)) {
+            if (Number(qty) > 0) {
+              receivedBills[denom] = (receivedBills[denom] || 0) + Number(qty)
+            }
+          }
+        }
+      }
+      for (const [denom, qty] of Object.entries(changeValue.bills || {})) {
+        if (Number(qty) > 0) {
+          changeBills[denom] = (changeBills[denom] || 0) + Number(qty)
+        }
+      }
+
+      if (Object.keys(receivedBills).length) {
+        await addLocalBillMovements({
+          sessionId: cashSession.id,
+          type: 'venta',
+          counts: receivedBills,
+          saleId: clientId,
+          note: 'Venta ' + orderNumber,
+          syncStatus: 'with_sale',
+        })
+      }
+      if (Object.keys(changeBills).length) {
+        await addLocalBillMovements({
+          sessionId: cashSession.id,
+          type: 'vuelto',
+          counts: changeBills,
+          saleId: clientId,
+          note: 'Vuelto ' + orderNumber,
+          syncStatus: 'with_sale',
+        })
+      }
+
+      await loadCash()
 
       const receiptSale = {
         ...salePayload,
         items: itemsPayload,
         payments: paymentsPayload,
+        change_value: changeValue,
       }
 
       setCompletedSale(receiptSale)
@@ -577,6 +850,12 @@ export default function AdminPOS() {
       setPayments([])
       setSaleNotes('')
       setCartOpen(false)
+      setChangeValue(emptyChange())
+      setOrderData(null)
+      setOrderId(null)
+      setOrderCustomer(null)
+      loadedOrderRef.current = null
+      setSearchParams({})
       push(
         online
           ? 'Venta registrada; sincronizando...'
@@ -597,6 +876,7 @@ export default function AdminPOS() {
       setSubmitting(false)
     }
   }
+
 
   const handleSync = async () => {
     if (!online || syncing) return
@@ -756,6 +1036,20 @@ export default function AdminPOS() {
           </>
         }
       />
+
+      {orderData ? (
+        <div className="alert alert-warn mb-3 flex items-center justify-between gap-2 wrap">
+          <span className="flex items-center gap-2">
+            <ClipboardList size={15} />
+            Cobrando comanda <strong>{orderData.order_number}</strong> de{' '}
+            {orderData.customer_name}
+            {orderData.fulfillment === 'delivery' ? ' · Delivery' : ' · Pickup'}
+          </span>
+          <button type="button" className="btn btn-sm" onClick={clearOrder}>
+            <X size={14} /> Quitar comanda
+          </button>
+        </div>
+      ) : null}
 
       {!cashSession && !cashLoading ? (
         <div className="alert alert-warn mb-3 flex items-center justify-between gap-2 wrap">
@@ -1079,11 +1373,17 @@ export default function AdminPOS() {
           <div style={{ textAlign: 'right' }}>
             <p className="label">Pagado</p>
             <p className="money positive" style={{ fontSize: 18 }}>{money(paidUsd)}</p>
-            <p className={`small ${remaining > 0.011 ? 'negative' : 'positive'}`}>
-              {remaining > 0.011 ? `Faltan ${money(remaining)}` : 'Cubierto'}
-            </p>
+            {changeDue > 0.011 ? (
+              <p className="small positive">Vuelto {money(changeDue)}</p>
+            ) : (
+              <p className={`small ${remaining > 0.011 ? 'negative' : 'positive'}`}>
+                {remaining > 0.011 ? `Faltan ${money(remaining)}` : 'Cubierto'}
+              </p>
+            )}
           </div>
         </div>
+
+        <p className="label mb-1">Tasa para bolívares</p>
 
         <p className="label mb-1">Tasa para bolívares</p>
         <div className={styles.rateRow}>
@@ -1156,20 +1456,40 @@ export default function AdminPOS() {
                   </button>
                 </div>
                 <div className={styles.paymentLineGrid}>
-                  <div className="field">
-                    <label>Monto</label>
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={payment.amount}
-                      onChange={(e) => updatePayment(payment.key, 'amount', e.target.value)}
-                    />
-                    <span className="tiny muted">
-                      {money(payment.amountUsd)} equivalente
-                    </span>
-                  </div>
+                  {payment.method.affects_cash && payment.method.currency === 'USD' ? (
+                    <div className="field" style={{ gridColumn: '1 / -1' }}>
+                      <BillPicker
+                        value={payment.bills || emptyBillCounts()}
+                        onChange={(bills) => updatePayment(payment.key, 'bills', bills)}
+                        compact
+                        label="Billetes que entrega"
+                        showClear={false}
+                      />
+                      <span className="tiny muted">
+                        Entrega: {money(payment.amountUsd)} ·{' '}
+                        {sumBills(payment.bills || {}) > 0
+                          ? 'Toca los billetes recibidos'
+                          : 'Selecciona los billetes del cliente'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="field">
+                      <label>
+                        {payment.method.currency === 'BS' ? 'Monto en Bs' : 'Monto'}
+                      </label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={payment.amount}
+                        onChange={(e) => updatePayment(payment.key, 'amount', e.target.value)}
+                      />
+                      <span className="tiny muted">
+                        {money(payment.amountUsd)} equivalente
+                      </span>
+                    </div>
+                  )}
                   <div className="field">
                     <label>Referencia</label>
                     <input
@@ -1179,13 +1499,30 @@ export default function AdminPOS() {
                       placeholder={payment.method.requires_reference ? 'Obligatoria' : 'Opcional'}
                     />
                   </div>
-                </div>
-              </div>
+                </div>              </div>
             ))}
           </div>
         ) : (
           <p className="muted small mt-2">Toca un método para agregar el pago.</p>
         )}
+
+        {changeDue > 0.011 ? (
+          <div className="mt-2">
+            <VueltoMixto
+              changeDue={changeDue}
+              drawer={sessionDrawer}
+              rate={rateNumber}
+              value={changeValue}
+              onChange={setChangeValue}
+              disabled={submitting}
+            />
+          </div>
+        ) : null}
+        {changeDue > 0.011 && cashPayments.length === 0 ? (
+          <p className="small negative mt-1">
+            El vuelto solo se puede dar desde un pago en efectivo.
+          </p>
+        ) : null}
 
         {!referencesOk ? (
           <p className="small negative mt-1">
@@ -1221,23 +1558,16 @@ export default function AdminPOS() {
         }
       >
         <p className="small muted mb-2">
-          Cuenta el efectivo inicial de la caja. Puedes abrir con cero si no hay fondo.
+          Cuenta los billetes con los que abre la caja. El total se calcula solo.
         </p>
-        <div className="form-grid">
+        <BillPicker
+          value={openingBills}
+          onChange={setOpeningBills}
+          label="Billetes de apertura"
+        />
+        <div className="form-grid mt-3">
           <div className="field">
-            <label>Efectivo USD</label>
-            <input
-              className="input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={openingUsd}
-              onChange={(e) => setOpeningUsd(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-          <div className="field">
-            <label>Efectivo Bs</label>
+            <label>Efectivo Bs inicial</label>
             <input
               className="input"
               type="number"
@@ -1248,7 +1578,22 @@ export default function AdminPOS() {
               placeholder="0.00"
             />
           </div>
+          <div className="field">
+            <label>Tasa del turno (Bs/USD)</label>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={rateValue}
+              onChange={(e) => setRateValue(e.target.value)}
+              placeholder="Tasa BCV EUR"
+            />
+          </div>
         </div>
+        <p className="small muted mt-2">
+          Total apertura: <strong>{money(sumBills(openingBills))}</strong>
+        </p>
       </Modal>
 
       <Modal

@@ -37,6 +37,10 @@ function normalizePayments(sale) {
     currency: p.currency || 'USD',
     amount: parseFloat(p.amount) || 0,
     amount_usd: parseFloat(p.amount_usd) || 0,
+    received_amount: parseFloat(p.received_amount) || null,
+    change_usd: parseFloat(p.change_usd) || 0,
+    change_bs: parseFloat(p.change_bs) || 0,
+    change_pm_amount: parseFloat(p.change_pm_amount) || 0,
   }))
 }
 
@@ -180,6 +184,28 @@ export async function generateReceiptPdf(sale) {
         y,
         { align: 'right' },
       )
+      if (p.received_amount && Math.abs(p.received_amount - p.amount) > 0.009) {
+        y += 4
+        doc.text(
+          p.currency === 'USD' || p.currency === 'USDT'
+            ? `Recibido: ${p.currency} ${p.received_amount.toFixed(2)}`
+            : `Recibido: ${bs(p.received_amount)}`,
+          20,
+          y,
+        )
+      }
+      if (p.change_usd > 0) {
+        y += 4
+        doc.text(`Vuelto USD: ${money(p.change_usd)}`, 20, y)
+      }
+      if (p.change_bs > 0) {
+        y += 4
+        doc.text(`Vuelto Bs: ${bs(p.change_bs)}`, 20, y)
+      }
+      if (p.change_pm_amount > 0) {
+        y += 4
+        doc.text(`Vuelto pago móvil: ${money(p.change_pm_amount)}`, 20, y)
+      }
       y += 5
     }
   }
