@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Clock3, MapPin, Store, Truck } from 'lucide-react'
+import { Clock3, MapPin, Truck, UtensilsCrossed } from 'lucide-react'
 import { bs as formatBs, money } from '../lib/currency'
 import { formatTime } from '../lib/dates'
 import styles from './OrderTicket.module.css'
@@ -34,6 +34,10 @@ export function orderStatusOrder(status) {
   return STATUS[status]?.order ?? 9
 }
 
+export function fulfillmentLabel(value) {
+  return value === 'delivery' ? 'Delivery' : 'Comer aquí'
+}
+
 export default function OrderTicket({ order, index = 0, onClick }) {
   const status = STATUS[order.status] || STATUS.nuevo
   const items = order.public_order_items || []
@@ -64,8 +68,12 @@ export default function OrderTicket({ order, index = 0, onClick }) {
 
         <span className={styles.metaRow}>
           <span className={styles.meta}>
-            {order.fulfillment === 'delivery' ? <Truck size={11} /> : <Store size={11} />}
-            {order.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}
+            {order.fulfillment === 'delivery' ? (
+              <Truck size={11} />
+            ) : (
+              <UtensilsCrossed size={11} />
+            )}
+            {fulfillmentLabel(order.fulfillment)}
           </span>
           <span className={styles.meta}>
             <Clock3 size={11} /> {formatTime(order.created_at)}
@@ -76,6 +84,9 @@ export default function OrderTicket({ order, index = 0, onClick }) {
           <span className={styles.address}>
             <MapPin size={11} /> {order.address}
           </span>
+        ) : null}
+        {order.fulfillment === 'delivery' ? (
+          <span className={styles.deliveryNote}>Delivery por cotizar</span>
         ) : null}
 
         <span className={styles.divider} />

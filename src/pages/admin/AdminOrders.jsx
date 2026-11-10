@@ -13,8 +13,8 @@ import {
   Phone,
   RefreshCw,
   Search,
-  Store,
   Truck,
+  UtensilsCrossed,
   Volume2,
   VolumeX,
   XCircle,
@@ -26,7 +26,11 @@ import {
   PageHeader,
   useToast,
 } from '../../components/ui'
-import OrderTicket, { orderStatusLabel, orderStatusOrder } from '../../components/OrderTicket'
+import OrderTicket, {
+  fulfillmentLabel,
+  orderStatusLabel,
+  orderStatusOrder,
+} from '../../components/OrderTicket'
 import { useOrdersBoard } from '../../hooks/usePublicOrders'
 import { supabase } from '../../lib/supabase'
 import { bs as formatBs, money } from '../../lib/currency'
@@ -489,9 +493,9 @@ export default function AdminOrders() {
                   {selected.fulfillment === 'delivery' ? (
                     <Truck size={12} />
                   ) : (
-                    <Store size={12} />
+                    <UtensilsCrossed size={12} />
                   )}
-                  {selected.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}
+                  {fulfillmentLabel(selected.fulfillment)}
                 </span>
               </div>
             </div>
@@ -499,7 +503,10 @@ export default function AdminOrders() {
             {selected.fulfillment === 'delivery' && selected.address ? (
               <div className={styles.addressBox}>
                 <MapPin size={14} />
-                <span>{selected.address}</span>
+                <div>
+                  <span>{selected.address}</span>
+                  <span className={styles.deliveryPending}>Delivery por cotizar</span>
+                </div>
               </div>
             ) : null}
 

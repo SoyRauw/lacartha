@@ -3,7 +3,6 @@ import {
   AtSign,
   CheckCircle2,
   Loader2,
-  MapPin,
   MessageCircle,
   Minus,
   Phone,
@@ -126,7 +125,7 @@ export default function PublicMenu() {
     if (meta) {
       meta.setAttribute(
         'content',
-        'La Cartha by Valentina Castro — banderillas coreanas, delivery y pickup en Maracaibo.',
+        'La Cartha by Valentina Castro — banderillas coreanas, delivery y comer aquí en Maracaibo.',
       )
     }
   }, [])
@@ -345,6 +344,8 @@ export default function PublicMenu() {
         message,
         totalUsd: Number(result.total_usd ?? cartTotalUsd),
         totalBs: Number(result.total_bs ?? cartTotalBs),
+        fulfillment: customer.fulfillment,
+        address: customer.address.trim(),
         registered: true,
       })
       setCheckoutOpen(false)
@@ -474,7 +475,7 @@ export default function PublicMenu() {
             </h1>
             <p className={styles.heroText}>
               Banderillas hechas al momento, con 1 topping y todas las salsas que quieras.
-              Delivery y pickup en Maracaibo.
+              Delivery y comer aquí en Maracaibo.
             </p>
             <div className={styles.heroActions}>
               <a className={styles.heroAction} href="#menu">
@@ -493,7 +494,7 @@ export default function PublicMenu() {
             </div>
             <div className={styles.heroMeta}>
               <span><Truck size={12} /> Delivery</span>
-              <span><Store size={12} /> Pickup</span>
+              <span><Store size={12} /> Comer aquí</span>
               <span><Phone size={12} /> {phone}</span>
               <span><AtSign size={12} /> {BUSINESS_INSTAGRAM_HANDLE}</span>
             </div>
@@ -515,8 +516,10 @@ export default function PublicMenu() {
           </div>
           <div className={styles.step}>
             <span className={styles.stepNum}>3</span>
-            <p className={styles.stepTitle}>Te damos los datos de pago</p>
-            <p className={styles.stepText}>Te respondemos por WhatsApp para coordinar.</p>
+            <p className={styles.stepTitle}>Paga y recibe</p>
+            <p className={styles.stepText}>
+              Comer aquí se paga en caja. Delivery se cotiza por WhatsApp.
+            </p>
           </div>
         </div>
       </section>
@@ -863,7 +866,7 @@ export default function PublicMenu() {
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
         title="Datos del pedido"
-        icon={MessageCircle}
+        icon={ShoppingBag}
         footer={
           <>
             <button type="button" className="btn" onClick={() => setCheckoutOpen(false)}>
@@ -875,7 +878,7 @@ export default function PublicMenu() {
               onClick={sendOrder}
               disabled={sending}
             >
-              {sending ? <Loader2 size={15} className="spin" /> : <MessageCircle size={15} />}
+              {sending ? <Loader2 size={15} className="spin" /> : <ShoppingBag size={15} />}
               Enviar pedido
             </button>
           </>
@@ -897,7 +900,7 @@ export default function PublicMenu() {
               className={`${styles.fulfillmentBtn} ${customer.fulfillment === 'pickup' ? styles.fulfillmentActive : ''}`}
               onClick={() => setCustomer((prev) => ({ ...prev, fulfillment: 'pickup' }))}
             >
-              <Store size={14} /> Pickup
+              <UtensilsCrossed size={14} /> Comer aquí
             </button>
           ) : null}
         </div>
@@ -933,11 +936,15 @@ export default function PublicMenu() {
               onChange={(e) => setCustomer((prev) => ({ ...prev, address: e.target.value }))}
               placeholder="Calle, casa, punto de referencia"
             />
+            <p className="tiny muted mt-1">
+              El costo del delivery se cotiza por WhatsApp. El total mostrado es solo de los
+              productos.
+            </p>
           </div>
         ) : (
           <div className="alert alert-warn mt-2">
-            <MapPin size={13} style={{ verticalAlign: -2 }} /> Pickup en La Cartha. Coordinamos
-            por WhatsApp.
+            <UtensilsCrossed size={13} style={{ verticalAlign: -2 }} /> Comer aquí en La
+            Cartha. Paga en caja.
           </div>
         )}
 
@@ -963,8 +970,9 @@ export default function PublicMenu() {
           </div>
         ) : null}
         <p className="tiny muted mt-2">
-          Al enviar, se abre WhatsApp con tu pedido. La Cartha te responderá con los datos de
-          pago.
+          {customer.fulfillment === 'delivery'
+            ? 'Al enviar, tu pedido llega al tablero. Te cotizamos el delivery y coordinamos por WhatsApp.'
+            : 'Al enviar, tu pedido llega al tablero de La Cartha. Paga en caja.'}
         </p>
       </Modal>
 
@@ -975,19 +983,20 @@ export default function PublicMenu() {
         icon={CheckCircle2}
         footer={
           <>
-            <button
-              type="button"
-              className="btn"
-              onClick={() =>
-                sentOrder &&
-                openWhatsApp(
-                  sentOrder.message,
-                  business?.whatsapp_phone || BUSINESS_WHATSAPP,
-                )
-              }
-            >
-              <MessageCircle size={15} /> Abrir WhatsApp
-            </button>
+            {sentOrder?.fulfillment === 'delivery' ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={() =>
+                  openWhatsApp(
+                    sentOrder.message,
+                    business?.whatsapp_phone || BUSINESS_WHATSAPP,
+                  )
+                }
+              >
+                <MessageCircle size={15} /> Abrir WhatsApp
+              </button>
+            ) : null}
             <button type="button" className="btn btn-primary" onClick={closeSent}>
               Hacer otro pedido
             </button>
@@ -999,7 +1008,9 @@ export default function PublicMenu() {
             <div className={styles.confirmIcon}>
               <CheckCircle2 size={32} />
             </div>
-            <p className="label">Pedido</p>
+            <p className="label">
+              {sentOrder.fulfillment === 'delivery' ? 'Delivery' : 'Comer aquí'} · Pedido
+            </p>
             <p className="money" style={{ fontSize: 18 }}>{sentOrder.orderNumber}</p>
             <p className="money" style={{ fontSize: 30, marginTop: 8 }}>
               {money(sentOrder.totalUsd)}
@@ -1008,11 +1019,14 @@ export default function PublicMenu() {
               <p className="muted">{formatBs(sentOrder.totalBs)}</p>
             ) : null}
             <p className="small muted mt-3">
-              Tu pedido quedó registrado en el tablero de La Cartha. Si quieres, envía el resumen por WhatsApp para coordinar el pago.
-              Si no se abrió, usa el botón “Abrir WhatsApp”.
+              {sentOrder.fulfillment === 'delivery'
+                ? 'Tu pedido quedó registrado. Abre WhatsApp para enviar la dirección y coordinar el costo del delivery y el pago.'
+                : 'Tu pedido quedó registrado. Paga en caja y muestra este número.'}
             </p>
             <p className="tiny muted mt-2">
-              Los datos de pago se comparten manualmente por WhatsApp.
+              {sentOrder.fulfillment === 'delivery'
+                ? 'El costo del delivery se cotiza por WhatsApp.'
+                : 'No necesitas enviar WhatsApp para este pedido.'}
             </p>
           </div>
         ) : null}

@@ -28,7 +28,7 @@ Sistema administrativo para **La Cartha by Valentina Castro** (banderillas corea
 - **Gastos**: categorías, moneda y medio de pago.
 - **Caja**: apertura y cierre por billetes, cajón en vivo, Bs, vuelto mixto y diferencia.
 - **Reportes**: ventas, márgenes, top productos, medios de pago y punto de equilibrio.
-- **Menú público** (`/menu`): carrito, precios USD/Bs, nombre y teléfono del cliente, y pedido que llega al tablero de comandas.
+- **Menú público** (`/menu`): carrito, precios USD/Bs, nombre y teléfono, “Comer aquí” o Delivery con pedido al tablero.
 - **Recibos PDF** descargables.
 
 ## Tasa BCV automática
@@ -148,9 +148,9 @@ La app no tiene registro público: solo entran usuarios creados en Supabase Auth
 
 - URL: `/menu`.
 - No muestra costos, stock ni datos de pago.
-- El cliente arma el pedido, escribe nombre, teléfono y tipo de entrega.
-- El pedido se registra en el tablero de comandas antes de abrir WhatsApp.
-- Valentina comparte los datos de pago manualmente por WhatsApp.
+- **Comer aquí:** el cliente deja nombre y teléfono, el pedido llega al tablero y se paga en caja. No abre WhatsApp.
+- **Delivery:** pide dirección obligatoria, el pedido llega al tablero y se coordina por WhatsApp.
+- El costo del delivery se cotiza manualmente por WhatsApp; no se suma automáticamente al total.
 - El QR se genera desde **Ajustes**.
 
 ## Deploy en GitHub Pages
@@ -203,4 +203,5 @@ npm test
 - Las compras actualizan el costo promedio ponderado en USD.
 - El costo de venta se congela al momento de vender.
 - El conteo semanal ajusta el stock real y registra la diferencia como merma.
+- El delivery se cotiza por WhatsApp y no se suma automáticamente al total de productos.
 - La marca La Cartha (nombre, logo y colores) es fija; los datos operativos son editables.

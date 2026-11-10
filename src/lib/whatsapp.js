@@ -20,10 +20,14 @@ export function buildOrderMessage({
   lines.push('')
   if (customer?.name) lines.push(`*Nombre:* ${customer.name}`)
   if (customer?.phone) lines.push(`*Teléfono:* ${customer.phone}`)
+  const isDelivery = customer?.fulfillment === 'delivery'
   if (customer?.fulfillment) {
-    lines.push(`*Entrega:* ${customer.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}`)
+    lines.push(`*Entrega:* ${isDelivery ? 'Delivery' : 'Comer aquí'}`)
   }
-  if (customer?.address) lines.push(`*Dirección:* ${customer.address}`)
+  if (isDelivery) {
+    lines.push('*Delivery:* Por cotizar')
+    if (customer?.address) lines.push(`*Dirección:* ${customer.address}`)
+  }
   lines.push('')
   lines.push('*Pedido:*')
   for (const item of items || []) {
@@ -38,7 +42,7 @@ export function buildOrderMessage({
     )
   }
   lines.push('')
-  lines.push(`*Total:* ${money(totalUsd)}`)
+  lines.push(`*${isDelivery ? 'Total productos' : 'Total'}:* ${money(totalUsd)}`)
   if (totalBs > 0) {
     const rateText =
       rateValue > 0
@@ -51,7 +55,11 @@ export function buildOrderMessage({
     lines.push(`*Notas:* ${notes}`)
   }
   lines.push('')
-  lines.push('Quedo atento a los datos de pago. ¡Gracias!')
+  lines.push(
+    isDelivery
+      ? 'Quedo atento al costo del delivery y a los datos de pago. ¡Gracias!'
+      : '¡Gracias!',
+  )
   return lines.join('\n')
 }
 

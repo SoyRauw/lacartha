@@ -255,8 +255,8 @@ export default function AdminPOS() {
           data.customer_phone +
           ' · ' +
           (data.fulfillment === 'delivery'
-            ? 'Delivery: ' + (data.address || '')
-            : 'Pickup'),
+            ? 'Delivery: ' + (data.address || '') + ' · Delivery por cotizar'
+            : 'Comer aquí'),
       )
       push('Comanda ' + data.order_number + ' cargada', 'success')
     }
@@ -1043,7 +1043,7 @@ export default function AdminPOS() {
             <ClipboardList size={15} />
             Cobrando comanda <strong>{orderData.order_number}</strong> de{' '}
             {orderData.customer_name}
-            {orderData.fulfillment === 'delivery' ? ' · Delivery' : ' · Pickup'}
+            {orderData.fulfillment === 'delivery' ? ' · Delivery' : ' · Comer aquí'}
           </span>
           <button type="button" className="btn btn-sm" onClick={clearOrder}>
             <X size={14} /> Quitar comanda

@@ -273,6 +273,16 @@
   color: var(--text);
 }
 
+.deliveryPending {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+
 .noteBox {
   background: #fff9ed;
 }

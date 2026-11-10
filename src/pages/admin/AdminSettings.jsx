@@ -395,7 +395,7 @@ export default function AdminSettings() {
                 checked={business?.pickup_enabled !== false}
                 onChange={(e) => setBusiness((prev) => ({ ...prev, pickup_enabled: e.target.checked }))}
               />
-              Pickup
+              Comer aquí
             </label>
             <label className="checkbox-row">
               <input
