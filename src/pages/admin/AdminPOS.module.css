@@ -333,6 +333,49 @@
   font-size: 12px;
 }
 
+.customerBox {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--cream);
+  margin-bottom: 12px;
+}
+
+.paymentPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.methodPanel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+  padding: 10px;
+}
+
+.methodPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  flex-wrap: wrap;
+}
+
+.methodPanelInput {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.methodPanelReference {
+  margin-top: 6px;
+}
+
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;

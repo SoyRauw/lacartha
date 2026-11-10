@@ -59,6 +59,7 @@ function normalizePendingSale(row) {
     rate_source: payload.rate_source,
     rate_value: payload.rate_value,
     customer_name: payload.customer_name,
+    customer_phone: payload.customer_phone,
     notes: payload.notes,
     created_at: payload.created_at || row.created_at,
     items: payload.items || [],
@@ -106,6 +107,7 @@ export default function AdminSales() {
             rate_source,
             rate_value,
             customer_name,
+            customer_phone,
             notes,
             created_at,
             voided_at,
@@ -167,7 +169,8 @@ export default function AdminSales() {
         if (!q) return true
         return (
           (sale.order_number || '').toLowerCase().includes(q) ||
-          (sale.customer_name || '').toLowerCase().includes(q)
+          (sale.customer_name || '').toLowerCase().includes(q) ||
+          (sale.customer_phone || '').toLowerCase().includes(q)
         )
       })
       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
@@ -311,7 +314,12 @@ export default function AdminSales() {
                       <div className="row-meta">{sale.payments?.[0]?.method_name || '—'}</div>
                     </td>
                     <td>{formatDateTime(sale.created_at)}</td>
-                    <td>{sale.customer_name || 'Mostrador'}</td>
+                    <td>
+                      {sale.customer_name || 'Mostrador'}
+                      {sale.customer_phone ? (
+                        <div className="tiny muted">{sale.customer_phone}</div>
+                      ) : null}
+                    </td>
                     <td className="num"><strong>{money(sale.total_usd)}</strong></td>
                     <td className="num">{formatBs(sale.total_bs)}</td>
                     <td>
@@ -390,6 +398,14 @@ export default function AdminSales() {
                   {detail.rate_value ? `${number(detail.rate_value)} Bs/USD` : '—'}
                 </p>
               </div>
+            </div>
+
+            <div className="mb-2">
+              <p className="label">Cliente</p>
+              <p className="small">
+                {detail.customer_name || 'Mostrador'}
+                {detail.customer_phone ? ` · ${detail.customer_phone}` : ''}
+              </p>
             </div>
 
             {detail.pending && detail.sync_error ? (

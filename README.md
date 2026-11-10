@@ -18,7 +18,7 @@ Sistema administrativo para **La Cartha by Valentina Castro** (banderillas corea
 
 - **Hoy**: ventas, costo, ganancia, gastos, efectivo y alertas.
 - **Comandas**: tablero en tiempo real con las facturas colgando; pedidos del menú público, estados, sonido y cobro directo desde el POS.
-- **Vender**: POS táctil con banderillas configurables (1 topping + salsas ilimitadas), pagos mixtos, billetes USD, vuelto y modo offline.
+- **Vender**: POS táctil con banderillas configurables (1 topping + salsas ilimitadas), datos del cliente, panel de pagos estilo elitestore, billetes USD, vuelto y modo offline.
 - **La banderilla**: constructor visual de la receta con flechas a masa, salchicha, queso, topping, salsas, palillo y empaque.
 - **Materia prima**: ingredientes, unidades, costos, stock y mínimos.
 - **Preparaciones**: masa y salsas caseras con rendimiento.
@@ -132,6 +132,7 @@ La app no tiene registro público: solo entran usuarios creados en Supabase Auth
 - El tablero tiene sonido, badge y notificaciones del navegador.
 - Cada factura se abre con el detalle completo: productos, topping, salsas, notas, dirección, teléfono y total.
 - **Cobrar comanda** abre el POS con el carrito cargado; al cobrar, la venta queda vinculada y la comanda pasa a entregada.
+- El POS carga automáticamente el nombre y teléfono de la comanda; se pueden editar antes de cobrar.
 - El botón de WhatsApp sigue disponible para coordinar el pago manualmente.
 
 ## Caja por billetes
@@ -197,6 +198,7 @@ npm test
 ## Notas
 
 - La moneda de cuenta es **USD**. Los precios se guardan en USD y el Bs se recalcula con la tasa elegida.
+- Las ventas guardan nombre y teléfono del cliente.
 - La tasa del turno se fija al abrir la caja y se usa para el vuelto en Bs.
 - Los billetes USD se controlan por denominación; los Bs se controlan por monto total.
 - El pago móvil como vuelto queda registrado en la venta, pero no afecta el cajón físico.

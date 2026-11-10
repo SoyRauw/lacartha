@@ -103,16 +103,19 @@ export async function generateReceiptPdf(sale) {
   doc.setFontSize(9)
   doc.setTextColor(128, 101, 85)
   doc.text(formatDateTime(sale.created_at || new Date()), 14, 64)
-  if (sale.customer_name) doc.text(`Cliente: ${sale.customer_name}`, 14, 70)
+  const customerLine = [sale.customer_name, sale.customer_phone]
+    .filter(Boolean)
+    .join(' · ')
+  if (customerLine) doc.text(`Cliente: ${customerLine}`, 14, 70)
   if (rateValue > 0) {
     doc.text(
       `Tasa: ${rateLabel(sale.rate_source)} ${formatRate(rateValue)} Bs/USD`,
       14,
-      sale.customer_name ? 76 : 70,
+      customerLine ? 76 : 70,
     )
   }
 
-  const tableStart = sale.customer_name ? 84 : 78
+  const tableStart = customerLine ? 84 : 78
   const body = items.map((it) => {
     const options = optionsText(it)
     return [

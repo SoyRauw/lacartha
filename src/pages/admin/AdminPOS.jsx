@@ -19,6 +19,7 @@ import {
   Smartphone,
   Trash2,
   UtensilsCrossed,
+  User,
   Wallet,
   X,
 } from 'lucide-react'
@@ -145,7 +146,8 @@ export default function AdminPOS() {
   const [sessionDrawer, setSessionDrawer] = useState(emptyBillCounts())
   const [changeValue, setChangeValue] = useState(emptyChange())
   const [orderData, setOrderData] = useState(null)
-  const [orderCustomer, setOrderCustomer] = useState(null)
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
   const [orderId, setOrderId] = useState(null)
   const loadedOrderRef = useRef(null)
   const lastChangeDueRef = useRef(0)
@@ -243,7 +245,8 @@ export default function AdminPOS() {
       setCart(mapped)
       setOrderData(data)
       setOrderId(data.id)
-      setOrderCustomer(data.customer_name)
+      setCustomerName(data.customer_name || '')
+      setCustomerPhone(data.customer_phone || '')
       if (Number(data.rate_value) > 0) {
         setRateValue(String(data.rate_value))
         setRateSource(data.rate_source || 'bcv_eur')
@@ -251,8 +254,6 @@ export default function AdminPOS() {
       setSaleNotes(
         'Comanda ' +
           data.order_number +
-          ' · ' +
-          data.customer_phone +
           ' · ' +
           (data.fulfillment === 'delivery'
             ? 'Delivery: ' + (data.address || '') + ' · Delivery por cotizar'
@@ -349,22 +350,37 @@ export default function AdminPOS() {
     : 0
   const configMargin = marginOf(configPrice, configCost)
 
-  const paidUsd = useMemo(
-    () => payments.reduce((sum, p) => sum + (Number(p.amountUsd) || 0), 0),
+  const activePayments = useMemo(
+    () =>
+      payments.filter(
+        (p) =>
+          Number(p.amountUsd) > 0 ||
+          Number(p.amount) > 0 ||
+          sumBills(p.bills || {}) > 0,
+      ),
     [payments],
+  )
+
+  const paidUsd = useMemo(
+    () => activePayments.reduce((sum, p) => sum + (Number(p.amountUsd) || 0), 0),
+    [activePayments],
   )
   const remaining = Math.max(0, total - paidUsd)
   const changeDue = Math.max(0, paidUsd - total)
   const rateNumber = parseNumber(rateValue) || 0
-  const cashPayments = payments.filter((p) => p.method.affects_cash)
-  const referencesOk = payments.every(
+  const cashPayments = activePayments.filter((p) => p.method.affects_cash)
+  const referencesOk = activePayments.every(
     (p) => !p.method.requires_reference || p.reference.trim().length > 0,
   )
+  const customerOk =
+    customerName.trim().length >= 2 &&
+    customerPhone.replace(/\D/g, '').length >= 7
   const changeCovered =
     changeDue <= 0.011 || isChangeCovered(changeValue, changeDue, rateNumber)
   const canCharge =
     total > 0 &&
-    payments.length > 0 &&
+    activePayments.length > 0 &&
+    customerOk &&
     remaining <= 0.011 &&
     referencesOk &&
     changeCovered
@@ -509,7 +525,8 @@ export default function AdminPOS() {
   const clearOrder = () => {
     setOrderData(null)
     setOrderId(null)
-    setOrderCustomer(null)
+    setCustomerName('')
+    setCustomerPhone('')
     setCart([])
     setSaleNotes('')
     loadedOrderRef.current = null
@@ -537,66 +554,73 @@ export default function AdminPOS() {
     setPaymentOpen(true)
   }
 
-  const addPayment = (method) => {
-    const rest = Math.max(0, total - paidUsd)
-    if (rest <= 0.011) {
-      push('La venta ya está cubierta', 'info')
-      return
-    }
+  const paymentFor = (methodId) =>
+    payments.find((payment) => payment.method.id === methodId) || null
+
+  const upsertPayment = (method, patch) => {
+    setPayments((prev) => {
+      const existing = prev.find((payment) => payment.method.id === method.id)
+      const base = existing || {
+        key: crypto.randomUUID(),
+        method,
+        amount: '',
+        amountUsd: 0,
+        reference: '',
+        bills:
+          method.affects_cash && method.currency === 'USD'
+            ? emptyBillCounts()
+            : null,
+      }
+      const next = { ...base, ...patch }
+      const hasMoney =
+        Number(next.amountUsd) > 0 ||
+        Number(next.amount) > 0 ||
+        sumBills(next.bills || {}) > 0
+      const hasReference = String(next.reference || '').trim().length > 0
+      if (!hasMoney && !hasReference) {
+        return prev.filter((payment) => payment.method.id !== method.id)
+      }
+      if (existing) {
+        return prev.map((payment) =>
+          payment.method.id === method.id ? next : payment,
+        )
+      }
+      return [...prev, next]
+    })
+  }
+
+  const setPaymentAmount = (method, value) => {
     const rate = parseNumber(rateValue) || 0
-    if (method.currency === 'BS' && rate <= 0) {
+    const amount = parseNumber(value)
+    if (method.currency === 'BS' && amount > 0 && rate <= 0) {
       push('Escribe la tasa Bs/USD para cobrar en bolívares', 'error')
       return
     }
-
-    const isCashUsd = method.affects_cash && method.currency === 'USD'
-    const amount = isCashUsd
-      ? ''
-      : method.currency === 'BS'
-        ? convertUsdToBs(rest, rate).toFixed(2)
-        : rest.toFixed(2)
-    const amountUsd = isCashUsd ? 0 : rest
-
-    setPayments((prev) => [
-      ...prev,
-      {
-        key: crypto.randomUUID(),
-        method,
-        amount,
-        amountUsd: amountUsd.toFixed(2),
-        reference: '',
-        bills: isCashUsd ? emptyBillCounts() : null,
-      },
-    ])
+    const amountUsd =
+      method.currency === 'BS' ? convertBsToUsd(amount, rate) : amount
+    upsertPayment(method, {
+      amount: value,
+      amountUsd: Number(amountUsd.toFixed(4)),
+      bills: null,
+    })
   }
 
-  const updatePayment = (key, field, value) => {
-    setPayments((prev) =>
-      prev.map((p) => {
-        if (p.key !== key) return p
-        if (field === 'amount') {
-          const amountNum = parseNumber(value)
-          const rate = parseNumber(rateValue) || 0
-          const amountUsd =
-            p.method.currency === 'BS' ? convertBsToUsd(amountNum, rate) : amountNum
-          return { ...p, amount: value, amountUsd: amountUsd.toFixed(2) }
-        }
-        if (field === 'bills') {
-          const totalBills = sumBills(value)
-          return {
-            ...p,
-            bills: value,
-            amount: totalBills ? totalBills.toFixed(2) : '',
-            amountUsd: totalBills.toFixed(2),
-          }
-        }
-        return { ...p, [field]: value }
-      }),
-    )
+  const setPaymentBills = (method, counts) => {
+    const totalBills = sumBills(counts)
+    upsertPayment(method, {
+      bills: counts,
+      amount: totalBills ? totalBills.toFixed(2) : '',
+      amountUsd: totalBills,
+    })
   }
 
-  const removePayment = (key) => {
-    setPayments((prev) => prev.filter((p) => p.key !== key))
+  const setPaymentReference = (method, value) => {
+    upsertPayment(method, { reference: value })
+  }
+
+  const clearPayments = () => {
+    setPayments([])
+    setChangeValue(emptyChange())
   }
 
   const changeRateSource = (source) => {
@@ -621,6 +645,14 @@ export default function AdminPOS() {
   const handleCharge = async () => {
     if (!cashSession) {
       setOpenCashOpen(true)
+      return
+    }
+    if (customerName.trim().length < 2) {
+      push('Escribe el nombre del cliente', 'error')
+      return
+    }
+    if (customerPhone.replace(/\D/g, '').length < 7) {
+      push('Escribe el teléfono del cliente', 'error')
       return
     }
     if (!canCharge) {
@@ -699,7 +731,7 @@ export default function AdminPOS() {
         }
       }
 
-      const paymentsPayload = payments.map((p) => {
+      const paymentsPayload = activePayments.map((p) => {
         const grossUsd = Number(p.amountUsd) || 0
         const isTarget = changeTarget?.key === p.key
         const appliedUsd = isTarget ? Math.max(0, grossUsd - changeDue) : grossUsd
@@ -743,7 +775,8 @@ export default function AdminPOS() {
         change_bs: changeBs,
         rate_source: rateSource,
         rate_value: rate,
-        customer_name: orderCustomer || null,
+        customer_name: customerName.trim() || null,
+        customer_phone: customerPhone.trim() || null,
         notes: saleNotes.trim() || null,
         created_at: now,
         items: itemsPayload,
@@ -799,7 +832,7 @@ export default function AdminPOS() {
 
       const receivedBills = {}
       const changeBills = {}
-      for (const payment of payments) {
+      for (const payment of activePayments) {
         if (payment.method.affects_cash && payment.method.currency === 'USD' && payment.bills) {
           for (const [denom, qty] of Object.entries(payment.bills)) {
             if (Number(qty) > 0) {
@@ -853,7 +886,8 @@ export default function AdminPOS() {
       setChangeValue(emptyChange())
       setOrderData(null)
       setOrderId(null)
-      setOrderCustomer(null)
+      setCustomerName('')
+      setCustomerPhone('')
       loadedOrderRef.current = null
       setSearchParams({})
       push(
@@ -1383,7 +1417,49 @@ export default function AdminPOS() {
           </div>
         </div>
 
-        <p className="label mb-1">Tasa para bolívares</p>
+        <div className={styles.customerBox}>
+          <div className="flex items-center justify-between gap-2 wrap mb-2">
+            <p className="label" style={{ margin: 0 }}>
+              <User size={14} style={{ verticalAlign: -2 }} /> Datos del cliente
+            </p>
+            {orderId ? (
+              <span className="badge badge-yellow">
+                Comanda {orderData?.order_number || ''}
+              </span>
+            ) : null}
+          </div>
+          <div className="form-grid">
+            <div className="field">
+              <label>Nombre *</label>
+              <input
+                className="input"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Nombre del cliente"
+              />
+            </div>
+            <div className="field">
+              <label>Teléfono *</label>
+              <input
+                className="input"
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="0414-0000000"
+              />
+            </div>
+          </div>
+          {orderId ? (
+            <p className="tiny muted mt-1">
+              Datos traídos de la comanda. Puedes editarlos.
+            </p>
+          ) : null}
+          {!customerOk ? (
+            <p className="small negative mt-1">
+              Completa nombre y teléfono para cobrar.
+            </p>
+          ) : null}
+        </div>
 
         <p className="label mb-1">Tasa para bolívares</p>
         <div className={styles.rateRow}>
@@ -1414,97 +1490,88 @@ export default function AdminPOS() {
           </p>
         ) : null}
 
-        <p className="label mb-1">Métodos de pago</p>
-        <div className={styles.paymentGrid}>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <p className="label" style={{ margin: 0 }}>Métodos de pago</p>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={clearPayments}>
+            Limpiar pagos
+          </button>
+        </div>
+        <div className={styles.paymentPanel}>
           {paymentMethods.map((method) => {
             const Icon = methodIcon(method.code)
+            const payment = paymentFor(method.id)
+            const isCashUsd = method.affects_cash && method.currency === 'USD'
+            const amount = payment?.amount ?? ''
+            const amountUsd = Number(payment?.amountUsd) || 0
             return (
-              <button
-                key={method.id}
-                type="button"
-                className={styles.paymentMethodBtn}
-                onClick={() => addPayment(method)}
-              >
-                <span className="flex items-center gap-2">
-                  <Icon size={16} style={{ color: 'var(--orange)' }} />
-                  <span className={styles.paymentMethodName}>{method.name}</span>
-                </span>
-                <span className={styles.paymentMethodMeta}>
-                  {method.currency === 'BS' ? 'Bolívares' : method.currency}
-                  {method.affects_cash ? ' · caja' : ''}
-                </span>
-              </button>
+              <div className={styles.methodPanel} key={method.id} data-method={method.code}>
+                <div className={styles.methodPanelHead}>
+                  <span className="flex items-center gap-2">
+                    <Icon size={15} style={{ color: 'var(--orange)' }} />
+                    <strong className={styles.paymentMethodName}>{method.name}</strong>
+                  </span>
+                  <span className={styles.paymentMethodMeta}>
+                    {method.currency === 'BS' ? 'Bolívares' : method.currency}
+                    {method.affects_cash ? ' · caja' : ''}
+                  </span>
+                </div>
+
+                {isCashUsd ? (
+                  <div>
+                    <BillPicker
+                      value={payment?.bills || emptyBillCounts()}
+                      onChange={(bills) => setPaymentBills(method, bills)}
+                      compact
+                      label=""
+                      showTotal={false}
+                      showClear={false}
+                    />
+                    <p className="tiny muted mt-1">
+                      Entrega: {money(amountUsd)} ·{' '}
+                      {sumBills(payment?.bills || {}) > 0
+                        ? 'Billetes recibidos'
+                        : 'Toca los billetes que entrega el cliente'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className={styles.methodPanelInput}>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={amount}
+                      onChange={(e) => setPaymentAmount(method, e.target.value)}
+                      placeholder={
+                        method.currency === 'BS'
+                          ? 'Bs 0,00'
+                          : method.currency === 'USDT'
+                            ? 'USDT 0,00'
+                            : '$0,00'
+                      }
+                    />
+                    {method.currency === 'BS' && amountUsd > 0 ? (
+                      <span className="tiny muted">≈ {money(amountUsd)}</span>
+                    ) : null}
+                  </div>
+                )}
+
+                <div className={styles.methodPanelReference}>
+                  <input
+                    className="input"
+                    value={payment?.reference || ''}
+                    onChange={(e) => setPaymentReference(method, e.target.value)}
+                    placeholder={
+                      method.requires_reference
+                        ? 'Referencia obligatoria'
+                        : 'Referencia (opcional)'
+                    }
+                  />
+                </div>
+              </div>
             )
           })}
         </div>
-
-        {payments.length ? (
-          <div className="mt-3">
-            <p className="label mb-1">Pagos agregados</p>
-            {payments.map((payment) => (
-              <div className={styles.paymentLine} key={payment.key}>
-                <div className={styles.paymentLineTop}>
-                  <span className={styles.paymentLineName}>
-                    {payment.method.name} · {payment.method.currency}
-                  </span>
-                  <button
-                    type="button"
-                    className={styles.paymentLineDelete}
-                    onClick={() => removePayment(payment.key)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <div className={styles.paymentLineGrid}>
-                  {payment.method.affects_cash && payment.method.currency === 'USD' ? (
-                    <div className="field" style={{ gridColumn: '1 / -1' }}>
-                      <BillPicker
-                        value={payment.bills || emptyBillCounts()}
-                        onChange={(bills) => updatePayment(payment.key, 'bills', bills)}
-                        compact
-                        label="Billetes que entrega"
-                        showClear={false}
-                      />
-                      <span className="tiny muted">
-                        Entrega: {money(payment.amountUsd)} ·{' '}
-                        {sumBills(payment.bills || {}) > 0
-                          ? 'Toca los billetes recibidos'
-                          : 'Selecciona los billetes del cliente'}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="field">
-                      <label>
-                        {payment.method.currency === 'BS' ? 'Monto en Bs' : 'Monto'}
-                      </label>
-                      <input
-                        className="input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={payment.amount}
-                        onChange={(e) => updatePayment(payment.key, 'amount', e.target.value)}
-                      />
-                      <span className="tiny muted">
-                        {money(payment.amountUsd)} equivalente
-                      </span>
-                    </div>
-                  )}
-                  <div className="field">
-                    <label>Referencia</label>
-                    <input
-                      className="input"
-                      value={payment.reference}
-                      onChange={(e) => updatePayment(payment.key, 'reference', e.target.value)}
-                      placeholder={payment.method.requires_reference ? 'Obligatoria' : 'Opcional'}
-                    />
-                  </div>
-                </div>              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="muted small mt-2">Toca un método para agregar el pago.</p>
-        )}
 
         {changeDue > 0.011 ? (
           <div className="mt-2">
