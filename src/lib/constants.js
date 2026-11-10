@@ -78,7 +78,7 @@ export const SLOT_LABELS = {
   salchicha: 'Salchicha',
   queso: 'Queso',
   palillo: 'Palillo',
-  empaque: 'Empaque',
+  empaque: 'Vaso',
   bebida: 'Bebida',
   topping: 'Topping',
   salsa: 'Salsa',

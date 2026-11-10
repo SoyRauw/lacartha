@@ -297,7 +297,7 @@ function BanderillaDiagram({
         y={470}
         w={148}
         h={48}
-        label="Empaque"
+        label="Vaso"
         sub={qtyOf('empaque')}
         selected={selected}
         onSelect={onSelect}
@@ -690,7 +690,7 @@ export default function AdminBanderilla() {
 
   const copyBase = async () => {
     if (!selectedProduct) return
-    if (!window.confirm('¿Copiar masa, palillo y empaque a las otras banderillas?')) return
+    if (!window.confirm('¿Copiar masa, palillo y vaso a las otras banderillas?')) return
     const baseSlots = ['masa', 'palillo', 'empaque']
     const sourceItems = recipeItems.filter((item) => baseSlots.includes(item.slot))
     if (!sourceItems.length) {
